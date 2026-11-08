@@ -1,0 +1,27 @@
+name: Python checks
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: "0.13.1"
+      - name: Install all dependencies
+        run: bash scripts/install.sh --all-groups
+      - name: Ruff format
+        run: uv run --locked --all-groups ruff format --check .
+      - name: Ruff
+        run: uv run --locked --all-groups ruff check .
+      - name: ty
+        run: uv run --locked --all-groups ty check

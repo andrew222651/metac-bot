@@ -28,6 +28,10 @@ Create an account at [lightningrod.ai](https://lightningrod.ai/) and explore the
 uv run --group integrations python integrations/main_lightningrod_eval.py
 ```
 
+Use `--max-seeds` to limit input news seeds. The old `--max-questions` option
+remains an alias, but the LightningRod SDK limits seeds rather than guaranteeing
+the same number of generated questions.
+
 ### Bot Review
 
 **[metaculus-bot-review](https://github.com/LouisP96/metaculus-bot-review)** - Scores your bot's resolved forecasts and displays its reasoning on specific questions.

@@ -1,0 +1,40 @@
+name: Run OpenCode forecast
+description: Install OpenCode V2 and run the Python forecasting orchestrator
+inputs:
+  mode:
+    description: Tournament mode
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Test forecast validation and V2 client
+      shell: bash
+      run: uv run --locked python -m unittest discover -s tests -v
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Install OpenCode V2
+      shell: bash
+      run: npm install --global @opencode/cli@2.0.27
+    - name: Configure and start OpenCode
+      shell: bash
+      run: |
+        uv run python scripts/configure_ci.py
+        opencode service start
+        opencode mcp list
+    - name: Forecast
+      shell: bash
+      env:
+        FORECAST_MODE: ${{ inputs.mode }}
+      run: uv run --locked python -m metac_bot --mode "$FORECAST_MODE"
+    - name: Save forecast artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: forecasts-${{ inputs.mode }}
+        path: forecast_runs/
+        if-no-files-found: ignore
+    - name: Stop OpenCode
+      if: always()
+      shell: bash
+      run: opencode service stop

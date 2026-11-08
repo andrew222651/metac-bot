@@ -1,14 +1,9 @@
-"""
-Runtime helpers for the template bot: environment validation, startup/result
-banners, and suppression of noisy upstream warnings.
+"""Environment validation, dependency warnings, and run summaries."""
 
-Kept separate from main.py so that file can focus on the bot's forecasting
-logic. main_with_no_framework.py keeps its own inline copies on purpose --
-it's meant to be a single-file reference implementation.
-"""
 from __future__ import annotations
 
 import logging
+import importlib
 import os
 import sys
 import warnings
@@ -26,7 +21,7 @@ _PLACEHOLDER_ENV_VALUES = {
 }
 
 
-def _is_real_env(name: str) -> bool:
+def is_real_env(name: str) -> bool:
     val = os.getenv(name)
     return bool(val and val.strip() and val.strip() not in _PLACEHOLDER_ENV_VALUES)
 
@@ -36,17 +31,13 @@ def silence_noisy_dependencies() -> None:
     Quiet warnings from transitive deps that fire on import and confuse new
     users. Must be called *before* importing forecasting_tools.
     """
-    warnings.filterwarnings(
-        "ignore", message=r".*does not support cost tracking.*"
-    )
+    warnings.filterwarnings("ignore", message=r".*does not support cost tracking.*")
     logging.getLogger("forecasting_tools.ai_models.model_tracker").setLevel(
         logging.ERROR
     )
     # Streamlit installs its own logger hierarchy; suppress via its own API.
     try:
-        from streamlit.logger import set_log_level
-
-        set_log_level("error")
+        importlib.import_module("streamlit.logger").set_log_level("error")
     except ImportError:
         pass
     # LiteLLM is verbose at INFO; its WARNING level is enough for us.
@@ -55,24 +46,24 @@ def silence_noisy_dependencies() -> None:
     litellm_logger.propagate = False
 
 
-def check_environment(strict: bool = True) -> None:
+def check_environment(strict: bool = True, require_llm_key: bool = True) -> None:
     """
-    Verify METACULUS_TOKEN and at least one LLM key are set. On failure with
+    Verify METACULUS_TOKEN and optionally an LLM key are set. On failure with
     strict=True, exits the process with a non-zero status.
     """
     problems: list[str] = []
 
-    if not _is_real_env("METACULUS_TOKEN"):
+    if not is_real_env("METACULUS_TOKEN"):
         problems.append(
             "METACULUS_TOKEN is missing or still a placeholder. "
             "Get one at https://www.metaculus.com/futureeval/participate/"
         )
 
     has_llm_key = any(
-        _is_real_env(k)
+        is_real_env(k)
         for k in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY")
     )
-    if not has_llm_key:
+    if require_llm_key and not has_llm_key:
         problems.append(
             "No LLM key set. Set OPENROUTER_API_KEY, OPENAI_API_KEY or "
             "ANTHROPIC_API_KEY (free OpenRouter credits: "
@@ -124,9 +115,7 @@ def print_run_summary_banner(
         verb = "submitted" if will_publish else "produced (dry run)"
         print(f"🎉  Bot {verb} {len(valid)} forecast(s).")
     elif valid and exceptions:
-        print(
-            f"⚠️   Partial — {len(valid)} succeeded, {len(exceptions)} failed."
-        )
+        print(f"⚠️   Partial — {len(valid)} succeeded, {len(exceptions)} failed.")
     else:
         print(f"❌  All {len(exceptions)} attempt(s) failed.")
 

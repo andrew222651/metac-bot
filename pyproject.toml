@@ -9,10 +9,24 @@ dependencies = [
     "python-decouple>=3.8,<4",
     "requests>=2.32.3,<3",
     "asknews>=0.13.11,<0.14",
-    "numpy>=2.3.0,<3",
+    # PyTensor's supported Numba release requires NumPy below 2.5.
+    "numpy>=2.3.0,<2.5",
     "openai>=2.0.0,<3",
     "python-dotenv>=1.0.1,<2",
     "forecasting-tools>=0.2.90,<0.4.0",
+    "opencode-ai==0.1.0a36",
+    "httpx>=0.28,<1",
+    "mcp>=1.26,<2",
+    "jsonschema>=4.23,<5",
+    "cyclopts>=4,<5",
+    "scipy>=1.15,<2",
+    "sympy>=1.13,<2",
+    "pandas>=2.2,<4",
+    "statsmodels>=0.14,<0.15",
+    "networkx>=3.4,<4",
+    "pymc>=5,<6",
+    # Avoid older prereleases with incomplete NumPy compatibility metadata.
+    "numba>=0.65.1,<0.66",
 ]
 
 [dependency-groups]
@@ -22,6 +36,8 @@ integrations = [
 ]
 dev = [
     "ipykernel>=6.29.5,<7",
+    "ruff>=0.15,<0.16",
+    "ty>=0.0.95,<0.1",
 ]
 
 [tool.uv]
