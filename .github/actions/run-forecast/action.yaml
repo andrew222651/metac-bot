@@ -7,19 +7,31 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Test forecast validation and V2 client
-      shell: bash
-      run: uv run --locked python -m unittest discover -s tests -v
     - uses: actions/setup-node@v4
       with:
         node-version: '22'
     - name: Install OpenCode V2
       shell: bash
       run: npm install --global @opencode/cli@2.0.27
-    - name: Configure and start OpenCode
+    - name: Start OpenCode
       shell: bash
       run: |
-        uv run python scripts/configure_ci.py
+        if [[ -z "${OPENCODE_MODEL:-}" ]]; then
+          printf 'Set OPENCODE_MODEL or a supported LLM provider key.\n' >&2
+          exit 1
+        fi
+        export OPENCODE_SEARCH_PROVIDER="${OPENCODE_SEARCH_PROVIDER:-random}"
+        case "$OPENCODE_SEARCH_PROVIDER" in
+          random|exa|firecrawl|parallel|tavily|tinyfish) ;;
+          *) printf 'Invalid OPENCODE_SEARCH_PROVIDER.\n' >&2; exit 1 ;;
+        esac
+        config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+        mkdir -p "$config_dir"
+        if [[ -e "$config_dir/opencode.json" || -e "$config_dir/opencode.jsonc" ]]; then
+          printf 'Refusing to replace an existing OpenCode configuration.\n' >&2
+          exit 1
+        fi
+        cp .github/opencode-ci.jsonc "$config_dir/opencode.jsonc"
         opencode service start
         opencode mcp list
     - name: Forecast

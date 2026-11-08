@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 import httpx
-from metac_bot.opencode import OpenCode
+from metac_bot.infrastructure.opencode import OpenCode
 
 
 class OpenCodeTests(unittest.IsolatedAsyncioTestCase):

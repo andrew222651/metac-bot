@@ -1,4 +1,5 @@
 import io
+import os
 from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -7,9 +8,11 @@ from unittest.mock import AsyncMock, patch
 
 from forecasting_tools import BinaryReport, MultipleChoiceQuestion, MultipleChoiceReport
 
-from metac_bot import jobs, runner
-from metac_bot.cli import parse_args
-from metac_bot.config import OneOffConfig
+from metac_bot import runner
+from metac_bot.forecasting import jobs
+from metac_bot.infrastructure.cli import parse_args
+from metac_bot.infrastructure.config import OneOffConfig
+from metac_bot.infrastructure.opencode_service import SERVICE_ENVIRONMENT
 
 
 class OneOffCliTests(unittest.TestCase):
@@ -100,6 +103,18 @@ class OneOffCliTests(unittest.TestCase):
 
 
 class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        environment = patch.dict(
+            os.environ,
+            {
+                **dict.fromkeys(SERVICE_ENVIRONMENT, ""),
+                "OPENROUTER_API_KEY": "",
+                "OPENCODE_SEARCH_PROVIDER": "",
+            },
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
+
     async def test_one_off_uses_ensemble_without_metaculus_or_publishing(self):
         config = OneOffConfig(
             question="Which party?", options=("PP", "PSOE"), model="provider/model"

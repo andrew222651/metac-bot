@@ -14,11 +14,10 @@ from .bayesian import (
     candidates_from_proposals,
 )
 from .bayesian_jobs import create_stage, read_stage
-from .config import MODEL_ROLES, ROLES
+from .roles import MODEL_ROLES, ROLES
 from .domain import build_prediction
 from .jobs import job_path, write_json
-
-Stage = Literal["proposal", "review", "decision"]
+from .prompts import Stage, stage_prompt
 
 
 @dataclass(frozen=True)
@@ -95,28 +94,11 @@ class EnsembleRunner:
         )
 
     def _prompt(self, stage: Stage, label: str, stage_id: str) -> str:
-        if stage == "proposal":
-            instructions = ROLES.get(label, "")
-        elif stage == "review":
-            instructions = (
-                f"Review the supplied work from the {label} perspective; "
-                "do not redo the initial research or rebuild the model."
-            )
-        else:
-            instructions = ""
-        standalone = (
-            "This is a standalone user-supplied question: do not look it up on Metaculus "
-            "or ask for a Metaculus token."
-            if self.question.custom_metadata.get("one_off")
-            else ""
-        )
-        return (
-            f"Load the bayesian-ensemble skill and complete your {stage} stage {stage_id}. "
-            f"{instructions} "
-            "Use metaculus.get_bayesian_stage and metaculus.record_bayesian_stage. "
-            "Follow the provided JSON schema, correct validation errors, and record your result. "
-            "The Python runner computes and stores the forecast; do not publish or edit files. "
-            f"{standalone}"
+        return stage_prompt(
+            stage,
+            label,
+            stage_id,
+            one_off=bool(self.question.custom_metadata.get("one_off")),
         )
 
     async def _run_stage(self, stage: Stage, label: str, context: dict) -> dict | None:

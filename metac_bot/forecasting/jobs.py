@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from ..infrastructure.paths import ROOT
 from .domain import build_report, load_question, prediction_schema
 
-ROOT = Path(__file__).resolve().parents[1]
 JOBS = ROOT / "forecast_runs"
 
 

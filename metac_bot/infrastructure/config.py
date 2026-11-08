@@ -4,41 +4,8 @@ from dataclasses import dataclass, field
 import math
 from typing import Literal
 
-ROLES = {
-    "generalist": "Evaluate the full question and balanced scenarios.",
-    "base-rate": "Focus on reference classes, historical frequencies and prior selection.",
-    "current-evidence": "Focus on recent developments and authoritative primary sources.",
-    "skeptic": "Challenge key assumptions and seek credible counterevidence.",
-    "quantitative": "Focus on measurable trends, explicit likelihoods and uncertainty.",
-    "economic-modeler": (
-        "Load the economic-modeling and modeling-python skills and build an explicit economic model, "
-        "such as a DSGE-style model when appropriate. Record the required model artifact."
-    ),
-    "causal-modeler": (
-        "Load the bayesian-causal-modeling and modeling-python skills and build an explicit Bayesian causal model. "
-        "Record the required model artifact."
-    ),
-}
-
-MODEL_ROLES = {"economic-modeler": "economic", "causal-modeler": "causal"}
-
-
-def model_reference(model: str | None) -> dict[str, str] | None:
-    """Validate a provider/model string and convert it to the V2 API shape."""
-    if model is None:
-        return None
-    provider, separator, name = model.partition("/")
-    identifier, variant_separator, variant = name.partition("#")
-    if not separator or not provider or not identifier:
-        raise ValueError(
-            "Model must be provider/model, optionally followed by #variant"
-        )
-    if variant_separator and not variant:
-        raise ValueError("Model variant must not be empty")
-    result = {"providerID": provider, "id": identifier}
-    if variant_separator:
-        result["variant"] = variant
-    return result
+from ..forecasting.roles import ROLES
+from .models import model_reference
 
 
 def validate_model(model: str | None) -> None:
@@ -53,6 +20,7 @@ class RunConfig:
     model: str | None = None
     timeout: float = 900
     api_timeout: float = 30
+    service_start_timeout: float = 60
     single_agent: bool = False
     ensemble_concurrency: int = 2
     ensemble_min_members: int = 3
@@ -72,6 +40,8 @@ class RunConfig:
             or self.timeout <= 0
             or not math.isfinite(self.api_timeout)
             or self.api_timeout <= 0
+            or not math.isfinite(self.service_start_timeout)
+            or self.service_start_timeout <= 0
             or (self.limit is not None and self.limit <= 0)
         ):
             raise ValueError("Timeouts and --limit must be finite and positive")

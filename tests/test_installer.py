@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
@@ -43,6 +44,22 @@ fi
 exit 0
 """,
         )
+        self.stubs = self.base / "stubs"
+        self.stubs.mkdir()
+        for name in ("uv", "proot-distro"):
+            shutil.copy2(self.bin / name, self.stubs / name)
+        self.executable(
+            "pkg",
+            """#!/bin/bash
+printf 'pkg %s\\n' "$*" >> "$FAKE_LOG"
+if [[ "${FAKE_PKG_FAIL:-}" == 1 ]]; then exit 1; fi
+shift 2
+for package in "$@"; do
+  cp "$FAKE_STUBS/$package" "$FAKE_BIN/$package"
+  chmod +x "$FAKE_BIN/$package"
+done
+""",
+        )
 
     def executable(self, name, text):
         path = self.bin / name
@@ -56,6 +73,8 @@ exit 0
             **os.environ,
             "PATH": f"{self.bin}:/usr/bin:/bin",
             "FAKE_LOG": str(self.log),
+            "FAKE_STUBS": str(self.stubs),
+            "FAKE_BIN": str(self.bin),
             "FAKE_CONTAINER": container,
             "FAKE_PYTHON": python,
             "TERMUX_VERSION": "0.118" if termux else "",
@@ -101,6 +120,7 @@ exit 0
         self.assertFalse(
             any(" install debian" in call or "apt-get" in call for call in calls)
         )
+        self.assertFalse(any(call.startswith("pkg ") for call in calls))
         self.assertTrue(
             any(
                 "uv sync --locked --inexact" in call and "--all-groups" in call
@@ -123,6 +143,43 @@ exit 0
         self.assertEqual(len(calls), 1)
         self.assertTrue(calls[0].startswith("uv sync --locked --inexact --project "))
         self.assertIn("--all-groups", calls[0])
+
+    def test_termux_installs_missing_uv_and_proot(self):
+        (self.bin / "uv").unlink()
+        (self.bin / "proot-distro").unlink()
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls()
+        self.assertIn("pkg install -y uv proot-distro", calls)
+        self.assertTrue(any("uv sync --locked --inexact" in call for call in calls))
+
+    def test_termux_installs_only_the_missing_tool(self):
+        (self.bin / "uv").unlink()
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("pkg install -y uv", self.calls())
+        self.assertNotIn("pkg install -y uv proot-distro", self.calls())
+
+    def test_termux_installs_missing_proot_only(self):
+        (self.bin / "proot-distro").unlink()
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("pkg install -y proot-distro", self.calls())
+
+    def test_termux_reports_missing_package_manager(self):
+        (self.bin / "uv").unlink()
+        (self.bin / "pkg").unlink()
+        result = self.run_installer()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Termux package manager", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_linux_still_requires_uv(self):
+        (self.bin / "uv").unlink()
+        result = self.run_installer(termux=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("uv is required on Linux/macOS", result.stderr)
+        self.assertEqual(self.calls(), [])
 
     def test_invalid_arguments_fail_without_changing_environment(self):
         result = self.run_installer(args=("--unexpected",))

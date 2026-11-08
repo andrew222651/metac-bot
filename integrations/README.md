@@ -55,7 +55,7 @@ uv run --group integrations bot-review show <POST_ID> --forecaster R1:F3
 Two extras ship with this template:
 
 - **[.github/workflows/review_bot.yaml](../.github/workflows/review_bot.yaml)** runs the review weekly and attaches `review.json` and `review.md` to the run. It needs only `METACULUS_TOKEN`. It is off by default: set the repository variable `REVIEW_BOT_ENABLED` to `true` to turn it on (Settings → Secrets and variables → Actions → Variables).
-- **[.claude/skills/review-bot/SKILL.md](../.claude/skills/review-bot/SKILL.md)** drives the whole loop with Claude Code and writes up what it finds. Ask it to review how the bot did on a tournament.
+- **[.opencode/skills/review-bot/SKILL.md](../.opencode/skills/review-bot/SKILL.md)** drives the whole loop with OpenCode and writes up what it finds. Ask it to review how the bot did on a tournament.
 
 ## Add your own
 

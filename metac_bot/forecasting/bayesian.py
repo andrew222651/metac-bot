@@ -10,7 +10,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from .config import MODEL_ROLES
+from .roles import MODEL_ROLES
 
 
 class StrictModel(BaseModel):

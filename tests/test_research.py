@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from metac_bot import research
-from metac_bot.research_mcp import mcp
+from metac_bot.infrastructure import research
+from metac_bot.forecasting.research_mcp import mcp
 
 
 class ResearchTests(unittest.IsolatedAsyncioTestCase):

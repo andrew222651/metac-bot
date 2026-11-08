@@ -7,8 +7,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from forecasting_tools import BinaryQuestion
-from metac_bot.jobs import ROOT, create_job, read_report
-from metac_bot.opencode import OpenCode, discover_service
+from metac_bot.forecasting.jobs import ROOT, create_job, read_report
+from metac_bot.infrastructure.opencode import OpenCode, discover_service
 
 
 async def main():

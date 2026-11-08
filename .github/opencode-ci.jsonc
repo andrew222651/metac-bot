@@ -1,0 +1,4 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "websearch": { "provider": "{env:OPENCODE_SEARCH_PROVIDER}" }
+}

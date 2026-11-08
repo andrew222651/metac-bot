@@ -9,7 +9,7 @@ import time
 
 import httpx
 
-from .config import model_reference
+from .models import model_reference
 
 
 def discover_service() -> tuple[str, httpx.BasicAuth | None]:

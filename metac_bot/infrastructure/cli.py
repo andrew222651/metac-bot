@@ -2,19 +2,23 @@
 
 import asyncio
 from dataclasses import dataclass
+import json
 import logging
-import os
-from pathlib import Path
 import sys
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from cyclopts import App, Parameter
 from dotenv import load_dotenv
 
 from .config import ROLES, OneOffConfig, RunConfig
+from .environment import EnvironmentSettings, environment_help
+from .paths import ROOT
 
 app = App(
-    name="metac-bot", help="Run Metaculus forecasts using OpenCode.", version_flags=[]
+    name="metac-bot",
+    help="Run Metaculus forecasts using OpenCode.",
+    help_epilogue=environment_help(),
+    version_flags=[],
 )
 
 
@@ -29,34 +33,37 @@ class CommonOptions:
         ),
     ] = None
     timeout: Annotated[
-        float,
+        float | None,
         Parameter(
             name=("--timeout", "--session-timeout"),
             help="Default agent session deadline in seconds.",
         ),
-    ] = 900
+    ] = None
     api_timeout: Annotated[
-        float,
+        float | None,
         Parameter(
             help="OpenCode API request timeout in seconds, excluding session wait."
         ),
-    ] = 30
+    ] = None
+    service_start_timeout: Annotated[
+        float | None, Parameter(help="Private OpenCode startup deadline in seconds.")
+    ] = None
     single_agent: Annotated[
-        bool,
+        bool | None,
         Parameter(help="Use a single agent for binary and multiple-choice questions."),
-    ] = False
+    ] = None
     ensemble_concurrency: Annotated[
-        int, Parameter(help="Maximum simultaneous ensemble sessions.")
-    ] = 2
+        int | None, Parameter(help="Maximum simultaneous ensemble sessions.")
+    ] = None
     ensemble_min_members: Annotated[
-        int, Parameter(help="Minimum successful proposals and reviews (1–7).")
-    ] = 3
+        int | None, Parameter(help="Minimum successful proposals and reviews (1–7).")
+    ] = None
     ensemble_review_rounds: Annotated[
-        int, Parameter(help="Maximum review rounds (1–5).")
-    ] = 3
+        int | None, Parameter(help="Maximum review rounds (1–5).")
+    ] = None
     ensemble_tolerance: Annotated[
-        float, Parameter(help="Posterior-change convergence threshold.")
-    ] = 0.01
+        float | None, Parameter(help="Posterior-change convergence threshold.")
+    ] = None
     ensemble_proposal_timeout: Annotated[
         float | None,
         Parameter(help="Proposal session deadline; defaults to --timeout."),
@@ -82,33 +89,95 @@ class CommonOptions:
         dry_run: bool = False,
         limit: int | None = None,
     ) -> RunConfig:
+        overrides: dict[str, Any] = {
+            key: value
+            for key, value in {
+                "OPENCODE_MODEL": self.model,
+                "METAC_BOT_SESSION_TIMEOUT": self.timeout,
+                "METAC_BOT_API_TIMEOUT": self.api_timeout,
+                "METAC_BOT_SERVICE_START_TIMEOUT": self.service_start_timeout,
+                "METAC_BOT_SINGLE_AGENT": self.single_agent,
+                "METAC_BOT_ENSEMBLE_CONCURRENCY": self.ensemble_concurrency,
+                "METAC_BOT_ENSEMBLE_MIN_MEMBERS": self.ensemble_min_members,
+                "METAC_BOT_ENSEMBLE_REVIEW_ROUNDS": self.ensemble_review_rounds,
+                "METAC_BOT_ENSEMBLE_TOLERANCE": self.ensemble_tolerance,
+                "METAC_BOT_ENSEMBLE_PROPOSAL_TIMEOUT": self.ensemble_proposal_timeout,
+                "METAC_BOT_ENSEMBLE_REVIEW_TIMEOUT": self.ensemble_review_timeout,
+                "METAC_BOT_ENSEMBLE_DECISION_TIMEOUT": self.ensemble_decision_timeout,
+                "METAC_BOT_ENSEMBLE_ADJUDICATOR_MODEL": self.ensemble_adjudicator_model,
+            }.items()
+            if value is not None
+        }
+        settings = EnvironmentSettings(**overrides)
         models = {}
+        if settings.METAC_BOT_ENSEMBLE_MODELS and self.ensemble_model != []:
+            try:
+                models = json.loads(settings.METAC_BOT_ENSEMBLE_MODELS)
+            except ValueError as exc:
+                raise ValueError(
+                    "METAC_BOT_ENSEMBLE_MODELS must be a JSON object"
+                ) from exc
+            if not isinstance(models, dict) or any(
+                not isinstance(k, str) or not isinstance(v, str)
+                for k, v in models.items()
+            ):
+                raise ValueError(
+                    "METAC_BOT_ENSEMBLE_MODELS must map role names to model IDs"
+                )
+        if self.ensemble_model == []:
+            models.clear()
+        seen = set()
         for item in self.ensemble_model or []:
             role, separator, role_model = item.partition("=")
-            if not separator or role not in ROLES or role in models:
+            if not separator or role not in ROLES or role in seen:
                 raise ValueError(
                     f"Invalid --ensemble-model {item!r}; roles: {', '.join(ROLES)}"
                 )
+            seen.add(role)
             models[role] = role_model
+
+        def choose(value, default):
+            return default if value is None else value
+
         return RunConfig(
             mode=mode,
             dry_run=dry_run,
             limit=limit,
-            model=self.model
-            if self.model is not None
-            else os.getenv("OPENCODE_MODEL") or None,
-            timeout=self.timeout,
-            api_timeout=self.api_timeout,
-            single_agent=self.single_agent,
-            ensemble_concurrency=self.ensemble_concurrency,
-            ensemble_min_members=self.ensemble_min_members,
-            ensemble_review_rounds=self.ensemble_review_rounds,
-            ensemble_tolerance=self.ensemble_tolerance,
-            ensemble_proposal_timeout=self.ensemble_proposal_timeout,
-            ensemble_review_timeout=self.ensemble_review_timeout,
-            ensemble_decision_timeout=self.ensemble_decision_timeout,
+            model=choose(self.model, settings.OPENCODE_MODEL),
+            timeout=choose(self.timeout, settings.METAC_BOT_SESSION_TIMEOUT),
+            api_timeout=choose(self.api_timeout, settings.METAC_BOT_API_TIMEOUT),
+            service_start_timeout=choose(
+                self.service_start_timeout, settings.METAC_BOT_SERVICE_START_TIMEOUT
+            ),
+            single_agent=choose(self.single_agent, settings.METAC_BOT_SINGLE_AGENT),
+            ensemble_concurrency=choose(
+                self.ensemble_concurrency, settings.METAC_BOT_ENSEMBLE_CONCURRENCY
+            ),
+            ensemble_min_members=choose(
+                self.ensemble_min_members, settings.METAC_BOT_ENSEMBLE_MIN_MEMBERS
+            ),
+            ensemble_review_rounds=choose(
+                self.ensemble_review_rounds, settings.METAC_BOT_ENSEMBLE_REVIEW_ROUNDS
+            ),
+            ensemble_tolerance=choose(
+                self.ensemble_tolerance, settings.METAC_BOT_ENSEMBLE_TOLERANCE
+            ),
+            ensemble_proposal_timeout=choose(
+                self.ensemble_proposal_timeout,
+                settings.METAC_BOT_ENSEMBLE_PROPOSAL_TIMEOUT,
+            ),
+            ensemble_review_timeout=choose(
+                self.ensemble_review_timeout, settings.METAC_BOT_ENSEMBLE_REVIEW_TIMEOUT
+            ),
+            ensemble_decision_timeout=choose(
+                self.ensemble_decision_timeout,
+                settings.METAC_BOT_ENSEMBLE_DECISION_TIMEOUT,
+            ),
             ensemble_models=models,
-            ensemble_adjudicator_model=self.ensemble_adjudicator_model,
+            ensemble_adjudicator_model=choose(
+                self.ensemble_adjudicator_model,
+                settings.METAC_BOT_ENSEMBLE_ADJUDICATOR_MODEL,
+            ),
         )
 
 
@@ -172,8 +241,7 @@ def parse_args(argv: list[str] | None = None) -> RunConfig:
 
 
 def main() -> None:
-    root = Path(__file__).resolve().parent.parent
-    load_dotenv(root / ".env")
+    load_dotenv(ROOT / ".env")
     config = parse_args()
     logging.basicConfig(
         level=logging.INFO,
@@ -188,7 +256,7 @@ def main() -> None:
         logging.getLogger("forecasting_tools.helpers.metaculus_client").setLevel(
             logging.ERROR
         )
-    from .runner import run, run_one_off
+    from ..runner import run, run_one_off
 
     result = run_one_off(config) if isinstance(config, OneOffConfig) else run(config)
     raise SystemExit(asyncio.run(result))

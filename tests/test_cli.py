@@ -2,8 +2,8 @@ import os
 import unittest
 from unittest.mock import patch
 
-from metac_bot.cli import parse_args
-from metac_bot.config import RunConfig
+from metac_bot.infrastructure.cli import parse_args
+from metac_bot.infrastructure.config import RunConfig
 
 
 class ConfigTests(unittest.TestCase):

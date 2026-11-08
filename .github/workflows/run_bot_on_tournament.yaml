@@ -2,6 +2,25 @@ name: Forecast on new AI tournament questions
 
 on:
   workflow_dispatch:
+    inputs:
+      model:
+        description: "OpenCode provider/model (defaults to repository variable or available key)"
+        required: false
+        type: string
+      search_provider:
+        description: "Search provider (configured uses repository variable or random)"
+        required: false
+        type: choice
+        default: configured
+        options: [configured, random, exa, firecrawl, parallel, tavily, tinyfish]
+      session_timeout:
+        description: "Agent session timeout in seconds"
+        required: false
+        type: string
+      ensemble_concurrency:
+        description: "Maximum concurrent ensemble sessions"
+        required: false
+        type: string
   schedule:
     - cron: "7,27,47 * * * *" # every 20 min, offset off the hour. Make sure to skip already-forecasted questions!
 
@@ -48,5 +67,18 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
-          OPENCODE_SEARCH_PROVIDER: ${{ vars.OPENCODE_SEARCH_PROVIDER }}
+          OPENCODE_MODEL: ${{ inputs.model || vars.OPENCODE_MODEL || (secrets.OPENROUTER_API_KEY != '' && 'openrouter/openai/gpt-4.1-mini') || (secrets.OPENAI_API_KEY != '' && 'openai/gpt-4.1-mini') || (secrets.ANTHROPIC_API_KEY != '' && 'anthropic/claude-sonnet-4-5') || '' }}
+          OPENCODE_SEARCH_PROVIDER: ${{ (inputs.search_provider != 'configured' && inputs.search_provider) || vars.OPENCODE_SEARCH_PROVIDER || 'random' }}
+          METAC_BOT_SESSION_TIMEOUT: ${{ inputs.session_timeout || vars.METAC_BOT_SESSION_TIMEOUT || '900' }}
+          METAC_BOT_ENSEMBLE_CONCURRENCY: ${{ inputs.ensemble_concurrency || vars.METAC_BOT_ENSEMBLE_CONCURRENCY || '2' }}
+          METAC_BOT_API_TIMEOUT: ${{ vars.METAC_BOT_API_TIMEOUT }}
+          METAC_BOT_SERVICE_START_TIMEOUT: ${{ vars.METAC_BOT_SERVICE_START_TIMEOUT }}
+          METAC_BOT_SINGLE_AGENT: ${{ vars.METAC_BOT_SINGLE_AGENT }}
+          METAC_BOT_ENSEMBLE_MIN_MEMBERS: ${{ vars.METAC_BOT_ENSEMBLE_MIN_MEMBERS }}
+          METAC_BOT_ENSEMBLE_REVIEW_ROUNDS: ${{ vars.METAC_BOT_ENSEMBLE_REVIEW_ROUNDS }}
+          METAC_BOT_ENSEMBLE_TOLERANCE: ${{ vars.METAC_BOT_ENSEMBLE_TOLERANCE }}
+          METAC_BOT_ENSEMBLE_PROPOSAL_TIMEOUT: ${{ vars.METAC_BOT_ENSEMBLE_PROPOSAL_TIMEOUT }}
+          METAC_BOT_ENSEMBLE_REVIEW_TIMEOUT: ${{ vars.METAC_BOT_ENSEMBLE_REVIEW_TIMEOUT }}
+          METAC_BOT_ENSEMBLE_DECISION_TIMEOUT: ${{ vars.METAC_BOT_ENSEMBLE_DECISION_TIMEOUT }}
+          METAC_BOT_ENSEMBLE_MODELS: ${{ vars.METAC_BOT_ENSEMBLE_MODELS }}
+          METAC_BOT_ENSEMBLE_ADJUDICATOR_MODEL: ${{ vars.METAC_BOT_ENSEMBLE_ADJUDICATOR_MODEL }}

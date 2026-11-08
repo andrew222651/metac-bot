@@ -3,8 +3,8 @@
 from datetime import datetime, timezone
 from typing import Callable
 
-from .forecasting_principles import SUPERFORECASTING_PRINCIPLES
-from .jobs import ROOT
+from ..infrastructure.paths import ROOT
+from .principles import SUPERFORECASTING_PRINCIPLES
 
 
 async def run_agent(

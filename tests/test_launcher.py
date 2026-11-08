@@ -22,6 +22,9 @@ if [[ "$*" == 'debug paths state' ]]; then printf '/test-state\\n'; fi
 """,
                 "proot-distro": """#!/bin/bash
 printf 'proot-distro %s\\n' "$*" >> "$FAKE_LOG"
+source /dev/fd/3
+printf 'registration=%s\\n' "${OPENCODE_SERVICE_FILE:-}" >> "$FAKE_LOG"
+if [[ "${OPENROUTER_API_KEY:-}" == *'$('* ]]; then printf 'secret-forwarded\\n' >> "$FAKE_LOG"; fi
 """,
             }.items():
                 path = base / name
@@ -32,6 +35,7 @@ printf 'proot-distro %s\\n' "$*" >> "$FAKE_LOG"
                 "PATH": f"{base}:/usr/bin:/bin",
                 "FAKE_LOG": str(log),
                 "TERMUX_VERSION": "0.118",
+                "OPENROUTER_API_KEY": f"$(touch {base / 'injected'})",
             }
             for name in (
                 "PD_CONTAINER",
@@ -51,10 +55,11 @@ printf 'proot-distro %s\\n' "$*" >> "$FAKE_LOG"
             calls = log.read_text().splitlines()
             self.assertIn("opencode service start", calls)
             self.assertTrue(
-                any(
-                    "OPENCODE_SERVICE_FILE=/test-state/service.json" in c for c in calls
-                )
+                any("registration=/test-state/service.json" in c for c in calls)
             )
+            self.assertIn("secret-forwarded", calls)
+            self.assertFalse((base / "injected").exists())
+            self.assertNotIn(env["OPENROUTER_API_KEY"], "\n".join(calls))
             log.unlink()
             subprocess.run(
                 ["bash", str(script), "-m", "metac_bot.mcp_server"],

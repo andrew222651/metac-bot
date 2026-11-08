@@ -1274,6 +1274,15 @@ wheels = [
 ]
 
 [[package]]
+name = "json5"
+version = "0.12.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/12/ae/929aee9619e9eba9015207a9d2c1c54db18311da7eb4dcf6d41ad6f0eb67/json5-0.12.1.tar.gz", hash = "sha256:b2743e77b3242f8d03c143dd975a6ec7c52e2f2afe76ed934e53503dd4ad4990", size = 52191, upload-time = "2025-08-12T19:47:42.583Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/85/e2/05328bd2621be49a6fed9e3030b1e51a2d04537d3f816d211b9cc53c5262/json5-0.12.1-py3-none-any.whl", hash = "sha256:d9c9b3bc34a5f54d43c35e11ef7cb87d8bdd098c6ace87117a7b7e83e705c1d5", size = 36119, upload-time = "2025-08-12T19:47:41.131Z" },
+]
+
+[[package]]
 name = "jsonschema"
 version = "4.26.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1642,7 +1651,7 @@ wheels = [
 ]
 
 [[package]]
-name = "metac-bot-template"
+name = "metac-bot"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
@@ -1650,6 +1659,7 @@ dependencies = [
     { name = "cyclopts" },
     { name = "forecasting-tools" },
     { name = "httpx" },
+    { name = "json5" },
     { name = "jsonschema" },
     { name = "mcp" },
     { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -1659,6 +1669,7 @@ dependencies = [
     { name = "openai" },
     { name = "opencode-ai" },
     { name = "pandas" },
+    { name = "pydantic-settings" },
     { name = "pymc" },
     { name = "python-decouple" },
     { name = "python-dotenv" },
@@ -1686,6 +1697,7 @@ requires-dist = [
     { name = "cyclopts", specifier = ">=4,<5" },
     { name = "forecasting-tools", specifier = ">=0.2.90,<0.4.0" },
     { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "json5", specifier = ">=0.12,<0.13" },
     { name = "jsonschema", specifier = ">=4.23,<5" },
     { name = "mcp", specifier = ">=1.26,<2" },
     { name = "networkx", specifier = ">=3.4,<4" },
@@ -1694,6 +1706,7 @@ requires-dist = [
     { name = "openai", specifier = ">=2.0.0,<3" },
     { name = "opencode-ai", specifier = "==0.1.0a36" },
     { name = "pandas", specifier = ">=2.2,<4" },
+    { name = "pydantic-settings", specifier = ">=2,<3" },
     { name = "pymc", specifier = ">=5,<6" },
     { name = "python-decouple", specifier = ">=3.8,<4" },
     { name = "python-dotenv", specifier = ">=1.0.1,<2" },

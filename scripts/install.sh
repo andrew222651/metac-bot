@@ -14,15 +14,23 @@ if [[ $# -gt 0 ]]; then
   sync_options+=(--all-groups)
 fi
 
-if ! command -v uv >/dev/null 2>&1; then
-  printf 'uv is required; install it first: https://docs.astral.sh/uv/\n' >&2
-  exit 1
-fi
-
 if [[ -n "${TERMUX_VERSION:-}" && -z "${PD_CONTAINER:-}" ]]; then
-  if ! command -v proot-distro >/dev/null 2>&1; then
-    printf 'Termux requires proot-distro; install it first with pkg install proot-distro.\n' >&2
-    exit 1
+  missing=()
+  command -v uv >/dev/null 2>&1 || missing+=(uv)
+  command -v proot-distro >/dev/null 2>&1 || missing+=(proot-distro)
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    if ! command -v pkg >/dev/null 2>&1; then
+      printf 'Termux package manager (pkg) is required to install missing tools.\n' >&2
+      exit 1
+    fi
+    printf 'Installing missing Termux packages: %s\n' "${missing[*]}"
+    pkg install -y "${missing[@]}"
+    for tool in "${missing[@]}"; do
+      if ! command -v "$tool" >/dev/null 2>&1; then
+        printf 'Installed package %s did not provide an executable on PATH.\n' "$tool" >&2
+        exit 1
+      fi
+    done
   fi
 
   containers="$(proot-distro list --quiet)"
@@ -48,4 +56,8 @@ if [[ -n "${TERMUX_VERSION:-}" && -z "${PD_CONTAINER:-}" ]]; then
     uv sync --locked --inexact --python /usr/bin/python3 --project "$ROOT" "${sync_options[@]}"
 fi
 
+if ! command -v uv >/dev/null 2>&1; then
+  printf 'uv is required on Linux/macOS; install it first: https://docs.astral.sh/uv/\n' >&2
+  exit 1
+fi
 exec uv sync --locked --inexact --project "$ROOT" "${sync_options[@]}"

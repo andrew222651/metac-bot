@@ -4,15 +4,13 @@ An OpenCode-first bot for [Metaculus FutureEval](https://www.metaculus.com/futur
 
 ## Install
 
-Install [OpenCode V2](https://opencode.ai/v2/docs/) and [uv](https://docs.astral.sh/uv/), then run from the repository:
+Install [OpenCode V2](https://opencode.ai/v2/docs/), then run from the repository:
 
 ```bash
 bash scripts/install.sh
 ```
 
-On **Termux**, also install `proot-distro` (`pkg install proot-distro`), Bash, and standard Termux utilities. The installer creates a Debian Trixie container if needed and installs Python and the locked dependencies there. It reuses existing containers and does not overwrite an incompatible Python installation. Set `METAC_BOT_VENV` to override the default `/root/.venvs/metac-bot` environment.
-
-On Linux or macOS, uv selects or downloads a supported Python. Installation requires network access and free storage; it does not configure credentials or start OpenCode.
+On **Termux**, the installer installs missing tools and creates a Debian Trixie container if needed, then installs Python and the locked dependencies there. It reuses existing containers and does not overwrite an incompatible Python installation. Set `METAC_BOT_VENV` to override the default `/root/.venvs/metac-bot` environment.
 
 ## Run locally
 
@@ -27,7 +25,7 @@ On Linux or macOS, uv selects or downloads a supported Python. Installation requ
    bash scripts/python.sh -m metac_bot --mode test_questions --limit 1 --dry-run
    ```
 
-The bot uses the existing OpenCode service's configuration, permissions, and credentials. Provider keys set only in Python's environment do not reach an already-running service. Set `--model provider/model` or `OPENCODE_MODEL` to override the service's default model.
+CLI options override the matching environment variables; use `--help` to list them. With no explicit provider overrides, the bot uses your existing OpenCode service. An explicit `OPENROUTER_API_KEY` starts a private service with that key, without changing your saved OpenCode account. Other saved provider accounts are unavailable to that private service and need environment keys if used. Its session history is temporary, but forecast artifacts remain in `forecast_runs/`. An explicit `OPENCODE_SEARCH_PROVIDER` also uses a private service without changing your shared configuration. These overrides cannot be combined with `OPENCODE_SERVER_URL`.
 
 If OpenCode was already running before the project agents were added, run `opencode reload` so it discovers them. Reloading cancels pending permission requests and forms; resolve those first.
 
@@ -44,7 +42,7 @@ bash scripts/python.sh -m metac_bot forecast \
 
 Omit `--option` for a binary yes/no question. Add `--criteria` or `--background` when needed. Binary and multiple-choice questions use the full ensemble by default; `--single-agent` is an explicit cheaper alternative. This command always saves locally and never publishes.
 
-Both the one-off and tournament commands accept `--model`, per-role `--ensemble-model ROLE=PROVIDER/MODEL`, and `--ensemble-adjudicator-model`. Use `--timeout` (or `--session-timeout`) for the default session deadline, `--api-timeout` for OpenCode API requests, and `--ensemble-proposal-timeout`, `--ensemble-review-timeout`, or `--ensemble-decision-timeout` to override individual stages. Timeouts are in seconds; session and API defaults are 900 and 30. See `--help` for concurrency, quorum, review-round, and tolerance settings. MCP and research-provider timeouts are configured separately in OpenCode, not by these flags.
+Both the one-off and tournament commands accept `--model`, per-role `--ensemble-model ROLE=PROVIDER/MODEL`, and `--ensemble-adjudicator-model`. Use `--timeout` (or `--session-timeout`) for the default session deadline, `--api-timeout` for OpenCode API requests, and `--ensemble-proposal-timeout`, `--ensemble-review-timeout`, or `--ensemble-decision-timeout` to override individual stages. Corresponding `METAC_BOT_*` environment variables work on both Termux and GitHub Actions. See `--help` for their names and defaults. MCP and research-provider timeouts are configured separately in OpenCode.
 
 ### Forecast modes
 
@@ -65,7 +63,7 @@ bash scripts/python.sh -m metac_bot --mode test_questions
 
 Add repository secrets for `METACULUS_TOKEN` and at least one of `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`. Add a search key such as `EXA_API_KEY` or `TAVILY_API_KEY`; optional AskNews and Perplexity credentials are listed in `.env.template`.
 
-Optionally set repository variables `OPENCODE_MODEL` and `OPENCODE_SEARCH_PROVIDER`. Without a model variable, CI chooses a default from the available provider keys; search defaults to `random`.
+Optionally set repository variables `OPENCODE_MODEL`, `OPENCODE_SEARCH_PROVIDER`, `METAC_BOT_SESSION_TIMEOUT`, and `METAC_BOT_ENSEMBLE_CONCURRENCY`. Manual workflow inputs override those variables. Without a model variable, CI chooses a default from the available provider keys; search defaults to `random`. The CI-only OpenCode template reads its search setting from the environment and does not change your local OpenCode configuration.
 
 Run **Test Bot** manually first. It publishes to the testing area. The AI tournament workflow runs every 20 minutes, and the Cup workflow every two days. Workflows install OpenCode and dependencies, then upload `forecast_runs/` as artifacts.
 
@@ -81,6 +79,8 @@ The modeling agents can run Python with NumPy, SciPy, SymPy, pandas, statsmodels
 
 Reports, model artifacts, and session IDs are stored in `forecast_runs/` (ignored by Git). Agent definitions and skills live in `.opencode/`; MCP servers are configured in `opencode.jsonc` and implemented in `metac_bot/`.
 
+Python forecasting behavior lives in `metac_bot/forecasting/` (roles, prompts, ensemble, validation, and MCP tools). Runtime interfaces and adapters live in `metac_bot/infrastructure/` (CLI, configuration, OpenCode, and research services). `metac_bot/runner.py` connects the two and handles question selection and publication. The `python -m metac_bot` and existing MCP entry points remain unchanged.
+
 ## Development
 
 ```bash
@@ -93,4 +93,4 @@ bash scripts/python.sh -m ruff check .
 bash scripts/python.sh -m ty check
 ```
 
-Ruff and ty checks run on push. See [integrations/README.md](integrations/README.md) for LightningRod and bot-review.
+Ruff, ty, and the unit tests run on push. See [integrations/README.md](integrations/README.md) for LightningRod and bot-review.

@@ -36,11 +36,16 @@ jobs:
         run: uv sync --locked --group integrations
       - name: Review forecasts
         run: |
+          if [[ ! "$REVIEW_DAYS" =~ ^[0-9]+$ ]]; then
+            printf 'days must be a non-negative integer.\n' >&2
+            exit 1
+          fi
           uv run bot-review review \
-            --resolved-since ${{ inputs.days || 30 }} \
+            --resolved-since "$REVIEW_DAYS" \
             --output review.json \
             --summary review.md
         env:
+          REVIEW_DAYS: ${{ inputs.days || '30' }}
           METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }}
       - name: Show the summary in the run page
         run: cat review.md >> $GITHUB_STEP_SUMMARY

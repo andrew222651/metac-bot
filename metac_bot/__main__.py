@@ -1,5 +1,5 @@
 """Run the forecasting bot with ``python -m metac_bot``."""
 
-from .cli import main
+from .infrastructure.cli import main
 
 main()

@@ -1,16 +1,30 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from forecasting_tools import BinaryQuestion, BinaryReport
 from metac_bot import runner as main
-from metac_bot import jobs
-from metac_bot.config import RunConfig
-from metac_bot.forecasting_principles import SUPERFORECASTING_PRINCIPLES
+from metac_bot.forecasting import jobs
+from metac_bot.infrastructure.config import RunConfig
+from metac_bot.infrastructure.opencode_service import SERVICE_ENVIRONMENT
+from metac_bot.forecasting.principles import SUPERFORECASTING_PRINCIPLES
 
 
 class RunnerTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        environment = patch.dict(
+            os.environ,
+            {
+                **dict.fromkeys(SERVICE_ENVIRONMENT, ""),
+                "OPENROUTER_API_KEY": "",
+                "OPENCODE_SEARCH_PROVIDER": "",
+            },
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
+
     async def test_environment_failure_returns_without_starting_opencode(self):
         with (
             patch.object(main, "check_environment", side_effect=SystemExit(1)),

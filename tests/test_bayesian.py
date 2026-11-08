@@ -7,16 +7,16 @@ import unittest
 from unittest.mock import patch
 
 from forecasting_tools import BinaryQuestion, MultipleChoiceQuestion
-from metac_bot import jobs
-from metac_bot.bayesian import (
+from metac_bot.forecasting import jobs
+from metac_bot.forecasting.bayesian import (
     calculate_choice_posterior,
     calculate_posterior,
     candidates_from_proposals,
     validate_stage,
 )
-from metac_bot.bayesian_jobs import get_stage, record_stage
-from metac_bot.ensemble import EnsembleSettings, run_ensemble
-from metac_bot.forecasting_principles import SUPERFORECASTING_PRINCIPLES
+from metac_bot.forecasting.bayesian_jobs import get_stage, record_stage
+from metac_bot.forecasting.ensemble import EnsembleSettings, run_ensemble
+from metac_bot.forecasting.principles import SUPERFORECASTING_PRINCIPLES
 
 
 def proposal(url="https://example.org/a"):

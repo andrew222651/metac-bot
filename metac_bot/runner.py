@@ -11,12 +11,24 @@ from forecasting_tools import (
     PredictedOptionList,
 )
 
-from .agent import run_agent
-from .config import OneOffConfig, RunConfig
-from .ensemble import run_ensemble
-from .jobs import create_job, job_path, read_report, save_forecast, write_json
-from .opencode import OpenCode, discover_service
-from .runtime import check_environment, print_run_summary_banner, print_startup_banner
+from .forecasting.agent import run_agent
+from .forecasting.ensemble import run_ensemble
+from .forecasting.jobs import (
+    create_job,
+    job_path,
+    read_report,
+    save_forecast,
+    write_json,
+)
+from .forecasting.prompts import forecast_prompt
+from .infrastructure.config import OneOffConfig, RunConfig
+from .infrastructure.opencode import OpenCode, discover_service
+from .infrastructure.opencode_service import connect_for_run
+from .infrastructure.runtime import (
+    check_environment,
+    print_run_summary_banner,
+    print_startup_banner,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,18 +102,7 @@ async def forecast_question(opencode, metaculus, question, args: RunConfig):
                 model=args.model,
                 timeout=args.timeout,
                 on_session=record_session,
-                prompt=(
-                    f"Load the metaculus-forecast skill and complete forecasting job {job_id}. "
-                    "Use the Metaculus MCP tools to read the question and record your validated "
-                    "forecast. Research with your web tools. The runner handles output and publication settings. "
-                    + (
-                        "This is a standalone user-supplied question: do not look it up on Metaculus, "
-                        "ask for a Metaculus token, or publish it. "
-                        if isinstance(args, OneOffConfig)
-                        else ""
-                    )
-                    + "Do not change repository files."
-                ),
+                prompt=forecast_prompt(job_id, one_off=isinstance(args, OneOffConfig)),
             )
         if not (job_path(job_id) / "forecast.json").exists():
             messages = await opencode.messages(session_id)
@@ -142,8 +143,12 @@ async def run(args: RunConfig) -> int:
         print_run_summary_banner(reports, will_publish=not args.dry_run)
         return 0
 
-    url, auth = discover_service()
-    async with OpenCode(url, auth, timeout=args.api_timeout) as opencode:
+    async with connect_for_run(
+        api_timeout=args.api_timeout,
+        startup_timeout=args.service_start_timeout,
+        discover=discover_service,
+        client_factory=OpenCode,
+    ) as opencode:
         for question in selected:
             reports.append(await forecast_question(opencode, metaculus, question, args))
     print_run_summary_banner(reports, will_publish=not args.dry_run)
@@ -173,8 +178,12 @@ async def run_one_off(args: OneOffConfig) -> int:
     """Forecast only the supplied question; never fetch or publish to Metaculus."""
     question = one_off_question(args)
     print("Running a local one-off forecast (no publishing).", flush=True)
-    url, auth = discover_service()
-    async with OpenCode(url, auth, timeout=args.api_timeout) as opencode:
+    async with connect_for_run(
+        api_timeout=args.api_timeout,
+        startup_timeout=args.service_start_timeout,
+        discover=discover_service,
+        client_factory=OpenCode,
+    ) as opencode:
         report = await forecast_question(opencode, None, question, args)
     if isinstance(report, BaseException):
         print(f"Forecast failed: {report}")
