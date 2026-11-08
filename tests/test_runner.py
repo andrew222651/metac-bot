@@ -1,37 +1,23 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from forecasting_tools import BinaryQuestion, BinaryReport
 from metac_bot import runner as main
 from metac_bot.forecasting import jobs
 from metac_bot.infrastructure.config import RunConfig
-from metac_bot.infrastructure.opencode_service import SERVICE_ENVIRONMENT
 from metac_bot.forecasting.principles import SUPERFORECASTING_PRINCIPLES
 
 
 class RunnerTests(unittest.IsolatedAsyncioTestCase):
-    def setUp(self):
-        environment = patch.dict(
-            os.environ,
-            {
-                **dict.fromkeys(SERVICE_ENVIRONMENT, ""),
-                "OPENROUTER_API_KEY": "",
-                "OPENCODE_SEARCH_PROVIDER": "",
-            },
-        )
-        environment.start()
-        self.addCleanup(environment.stop)
-
     async def test_environment_failure_returns_without_starting_opencode(self):
         with (
             patch.object(main, "check_environment", side_effect=SystemExit(1)),
-            patch.object(main, "discover_service") as discover,
+            patch.object(main, "connect_for_run") as connect,
         ):
             self.assertEqual(await main.run(RunConfig()), 1)
-            discover.assert_not_called()
+            connect.assert_not_called()
 
     async def test_tournament_selection_skips_previous_and_deduplicates(self):
         seen = BinaryQuestion(
@@ -61,10 +47,10 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             patch.object(main, "check_environment"),
             patch.object(main, "print_startup_banner"),
             patch.object(main, "print_run_summary_banner"),
-            patch.object(main, "discover_service") as discover,
+            patch.object(main, "connect_for_run") as connect,
         ):
             self.assertEqual(await main.run(RunConfig()), 0)
-            discover.assert_not_called()
+            connect.assert_not_called()
 
     async def exercise(self, dry_run, record=True):
         question = BinaryQuestion(
@@ -97,8 +83,7 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             patch.object(main, "print_startup_banner"),
             patch.object(main, "print_run_summary_banner"),
             patch.object(main, "MetaculusClient", return_value=metaculus),
-            patch.object(main, "OpenCode", return_value=client),
-            patch.object(main, "discover_service", return_value=("http://test", None)),
+            patch.object(main, "connect_for_run", return_value=client),
             patch.object(
                 BinaryReport, "publish_report_to_metaculus", new_callable=AsyncMock
             ) as publish,
@@ -136,8 +121,7 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             patch.object(main, "print_startup_banner"),
             patch.object(main, "print_run_summary_banner"),
             patch.object(main, "MetaculusClient", return_value=metaculus),
-            patch.object(main, "OpenCode", return_value=client),
-            patch.object(main, "discover_service", return_value=("http://test", None)),
+            patch.object(main, "connect_for_run", return_value=client),
             patch.object(
                 main, "run_ensemble", new_callable=AsyncMock, return_value=result
             ) as ensemble,

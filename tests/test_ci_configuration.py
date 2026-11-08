@@ -1,6 +1,5 @@
 """Exercise GitHub workflow configuration without secrets or network access."""
 
-import json
 import os
 from pathlib import Path
 import subprocess
@@ -13,7 +12,6 @@ from metac_bot.infrastructure.environment import EnvironmentSettings
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTION = yaml.safe_load((ROOT / ".github/actions/run-forecast/action.yaml").read_text())
-REVIEW = yaml.safe_load((ROOT / ".github/workflows/review_bot.yaml").read_text())
 
 
 def step_script(workflow, name):
@@ -59,31 +57,21 @@ class CiConfigurationTests(unittest.TestCase):
             timeout=15,
         )
 
-    def test_ci_template_keeps_provider_as_environment_substitution(self):
-        template = json.loads((ROOT / ".github/opencode-ci.jsonc").read_text())
-        self.assertEqual(
-            template["websearch"]["provider"], "{env:OPENCODE_SEARCH_PROVIDER}"
-        )
-        self.assertNotIn("model", template)
-        result = self.run_step(step_script(ACTION["runs"]["steps"], "Start OpenCode"))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        target = self.base / "config/opencode/opencode.jsonc"
-        self.assertEqual(json.loads(target.read_text()), template)
-        self.assertEqual(
-            self.log.read_text().splitlines(), ["service", "start", "mcp", "list"]
-        )
-
-    def test_existing_config_is_not_overwritten(self):
+    def test_validation_does_not_touch_opencode_configuration_or_start_shared_service(
+        self,
+    ):
         target = self.base / "config/opencode/opencode.json"
         target.parent.mkdir(parents=True)
         target.write_text('{"custom": true}')
-        result = self.run_step(step_script(ACTION["runs"]["steps"], "Start OpenCode"))
-        self.assertNotEqual(result.returncode, 0)
+        result = self.run_step(
+            step_script(ACTION["runs"]["steps"], "Validate forecast settings")
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(target.read_text(), '{"custom": true}')
         self.assertFalse(self.log.exists())
 
     def test_provider_and_model_are_validated_before_service_start(self):
-        script = step_script(ACTION["runs"]["steps"], "Start OpenCode")
+        script = step_script(ACTION["runs"]["steps"], "Validate forecast settings")
         self.env["OPENCODE_SEARCH_PROVIDER"] = 'random"},"permissions":[]'
         result = self.run_step(script)
         self.assertNotEqual(result.returncode, 0)
@@ -120,57 +108,51 @@ class CiConfigurationTests(unittest.TestCase):
         self.assertNotIn("--timeout", args)
         self.assertNotIn("--ensemble-concurrency", args)
 
-    def test_review_days_rejects_shell_syntax(self):
-        marker = self.base / "injected"
-        self.env["REVIEW_DAYS"] = f"$(touch {marker})"
-        script = step_script(REVIEW["jobs"]["review_job"]["steps"], "Review forecasts")
-        result = self.run_step(script)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(marker.exists())
-        self.assertFalse(self.log.exists())
+    def test_forecast_passes_both_modes_to_runner(self):
+        for mode in ("test_questions", "tournament"):
+            with self.subTest(mode=mode):
+                self.log.unlink(missing_ok=True)
+                self.env["FORECAST_MODE"] = mode
+                result = self.run_step(step_script(ACTION["runs"]["steps"], "Forecast"))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                args = self.log.read_text().splitlines()
+                self.assertEqual(args[args.index("--mode") + 1], mode)
 
-    def test_review_days_is_passed_as_a_literal_argument(self):
-        self.env["REVIEW_DAYS"] = "45"
-        script = step_script(REVIEW["jobs"]["review_job"]["steps"], "Review forecasts")
-        result = self.run_step(script)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        args = self.log.read_text().splitlines()
-        self.assertEqual(args[args.index("--resolved-since") + 1], "45")
-
-    def test_all_forecasting_workflows_offer_dispatch_inputs(self):
-        for name in (
-            "test_bot.yaml",
-            "run_bot_on_tournament.yaml",
-            "run_bot_on_metaculus_cup.yaml",
+    def test_run_bot_workflow_offers_dispatch_inputs(self):
+        data = yaml.safe_load((ROOT / ".github/workflows/run_bot.yaml").read_text())
+        # PyYAML's YAML 1.1 parser interprets the key "on" as True.
+        inputs = data[True]["workflow_dispatch"]["inputs"]
+        self.assertEqual(
+            set(inputs),
+            {
+                "mode",
+                "model",
+                "search_provider",
+                "session_timeout",
+                "ensemble_concurrency",
+            },
+        )
+        run = next(
+            step
+            for step in data["jobs"]["forecast_job"]["steps"]
+            if step.get("name") == "Run bot"
+        )
+        for key in (
+            "OPENCODE_MODEL",
+            "OPENCODE_SEARCH_PROVIDER",
+            "METAC_BOT_SESSION_TIMEOUT",
+            "METAC_BOT_ENSEMBLE_CONCURRENCY",
         ):
-            data = yaml.safe_load((ROOT / ".github/workflows" / name).read_text())
-            # PyYAML's YAML 1.1 parser interprets the key "on" as True.
-            inputs = data[True]["workflow_dispatch"]["inputs"]
-            self.assertEqual(
-                set(inputs),
-                {"model", "search_provider", "session_timeout", "ensemble_concurrency"},
-            )
-            run = next(
-                step
-                for step in data["jobs"]["forecast_job"]["steps"]
-                if step.get("name") == "Run bot"
-            )
-            for key in (
-                "OPENCODE_MODEL",
-                "OPENCODE_SEARCH_PROVIDER",
-                "METAC_BOT_SESSION_TIMEOUT",
-                "METAC_BOT_ENSEMBLE_CONCURRENCY",
-            ):
-                self.assertIn("inputs.", run["env"][key])
-            runtime_settings = {
-                name
-                for name in EnvironmentSettings.model_fields
-                if name.startswith("METAC_BOT_")
-                and name
-                not in {
-                    "METAC_BOT_VENV",
-                    "METAC_BOT_HOST_CONFIG_HOME",
-                    "METAC_BOT_HOST_DATA_HOME",
-                }
+            self.assertIn("inputs.", run["env"][key])
+        runtime_settings = {
+            name
+            for name in EnvironmentSettings.model_fields
+            if name.startswith("METAC_BOT_")
+            and name
+            not in {
+                "METAC_BOT_VENV",
+                "METAC_BOT_HOST_CONFIG_HOME",
+                "METAC_BOT_HOST_DATA_HOME",
             }
-            self.assertTrue(runtime_settings.issubset(run["env"]))
+        }
+        self.assertTrue(runtime_settings.issubset(run["env"]))

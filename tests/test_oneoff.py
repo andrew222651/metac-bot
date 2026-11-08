@@ -1,5 +1,4 @@
 import io
-import os
 from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -12,7 +11,6 @@ from metac_bot import runner
 from metac_bot.forecasting import jobs
 from metac_bot.infrastructure.cli import parse_args
 from metac_bot.infrastructure.config import OneOffConfig
-from metac_bot.infrastructure.opencode_service import SERVICE_ENVIRONMENT
 
 
 class OneOffCliTests(unittest.TestCase):
@@ -103,18 +101,6 @@ class OneOffCliTests(unittest.TestCase):
 
 
 class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
-    def setUp(self):
-        environment = patch.dict(
-            os.environ,
-            {
-                **dict.fromkeys(SERVICE_ENVIRONMENT, ""),
-                "OPENROUTER_API_KEY": "",
-                "OPENCODE_SEARCH_PROVIDER": "",
-            },
-        )
-        environment.start()
-        self.addCleanup(environment.stop)
-
     async def test_one_off_uses_ensemble_without_metaculus_or_publishing(self):
         config = OneOffConfig(
             question="Which party?", options=("PP", "PSOE"), model="provider/model"
@@ -131,10 +117,7 @@ class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
             patch.object(jobs, "JOBS", Path(directory)),
             patch.object(runner, "MetaculusClient") as metaculus,
             patch.object(runner, "check_environment") as check_environment,
-            patch.object(
-                runner, "discover_service", return_value=("http://test", None)
-            ),
-            patch.object(runner, "OpenCode", return_value=client) as client_factory,
+            patch.object(runner, "connect_for_run", return_value=client) as connect,
             patch.object(
                 runner, "run_ensemble", new_callable=AsyncMock, return_value=result
             ) as ensemble,
@@ -149,8 +132,10 @@ class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
             metaculus.assert_not_called()
             check_environment.assert_not_called()
             ensemble.assert_awaited_once()
-            client_factory.assert_called_once_with(
-                "http://test", None, timeout=config.api_timeout
+            connect.assert_called_once_with(
+                api_timeout=config.api_timeout,
+                startup_timeout=config.service_start_timeout,
+                client_factory=runner.OpenCode,
             )
             publish.assert_not_awaited()
             assert ensemble.await_args is not None
@@ -180,10 +165,7 @@ class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
             client.wait.side_effect = record
             with (
                 patch.object(runner, "MetaculusClient") as metaculus,
-                patch.object(
-                    runner, "discover_service", return_value=("http://test", None)
-                ),
-                patch.object(runner, "OpenCode", return_value=client),
+                patch.object(runner, "connect_for_run", return_value=client),
                 patch.object(
                     BinaryReport, "publish_report_to_metaculus", new_callable=AsyncMock
                 ) as publish,

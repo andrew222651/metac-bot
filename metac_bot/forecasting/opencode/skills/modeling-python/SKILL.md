@@ -6,8 +6,8 @@ description: Run reproducible numerical, symbolic, statistical, econometric and 
 # Python modeling environment
 
 Run Python through `bash scripts/python.sh`, not an arbitrary system interpreter.
-The launcher uses this project's locked uv environment locally, in the Termux
-Debian setup, and in GitHub Actions. It includes:
+The launcher uses this project's locked uv environment in the Termux Debian setup.
+It includes:
 
 - NumPy for arrays and simulation, SciPy for optimization, distributions,
   integration and linear algebra, and SymPy for symbolic equations.
@@ -34,7 +34,7 @@ a security sandbox. Do not write project files unless explicitly authorized.
 On the Termux/PRoot setup the launcher defaults PyTensor to `cxx=` because the
 available Android compiler cannot build Linux extensions there. This is slower
 than native compiled execution; a caller can explicitly set `PYTENSOR_FLAGS` to
-override the default. Linux GitHub runners use PyTensor's normal compiler settings.
+override the default.
 
 Record the equations, complete reproducible code, data sources or synthetic
 assumptions, dependency versions if relevant, results and uncertainty in your

@@ -14,19 +14,6 @@ class ConnectionSettings(BaseSettings):
         case_sensitive=True, env_ignore_empty=True, extra="ignore"
     )
 
-    OPENCODE_SERVER_URL: str | None = Field(
-        None,
-        description="Connect to an explicit OpenCode server instead of discovering the shared service.",
-    )
-    OPENCODE_SERVER_USERNAME: str | None = Field(
-        None, description="Username for an explicit server; defaults to opencode."
-    )
-    OPENCODE_SERVER_PASSWORD: SecretStr | None = Field(
-        None, description="Password for an explicit OpenCode server."
-    )
-    OPENCODE_SERVICE_FILE: str | None = Field(
-        None, description="Path to an existing OpenCode service registration file."
-    )
     OPENROUTER_API_KEY: SecretStr | None = Field(
         None,
         description="Explicit OpenRouter key; uses a private server so it overrides saved accounts.",
@@ -74,7 +61,7 @@ class ConnectionSettings(BaseSettings):
     )
     XDG_CONFIG_HOME: str | None = Field(
         None,
-        description="Base directory for OpenCode configuration, including the CI search template.",
+        description="Base directory for OpenCode configuration.",
     )
     XDG_DATA_HOME: str | None = Field(
         None,
@@ -112,7 +99,8 @@ class EnvironmentSettings(ConnectionSettings):
         30, description="OpenCode API request timeout, in seconds."
     )
     METAC_BOT_SERVICE_START_TIMEOUT: float = Field(
-        60, description="Wait limit for private OpenCode server startup, in seconds."
+        60,
+        description="Wait limit in seconds for private OpenCode startup and, separately, MCP connections.",
     )
     METAC_BOT_SINGLE_AGENT: bool = Field(
         False, description="Use a single agent instead of the ensemble."
@@ -195,10 +183,6 @@ class EnvironmentSettings(ConnectionSettings):
         None,
         description="GitHub composite-action mode; the action passes it to --mode.",
     )
-    REVIEW_DAYS: str | None = Field(
-        None,
-        description="GitHub review-workflow input; validated before passing to bot-review.",
-    )
 
 
 def environment_help() -> str:
@@ -217,4 +201,25 @@ def environment_help() -> str:
             "to the OpenCode service or relevant MCP server; external tools may support additional variables.",
         ]
     )
+    return "\n".join(lines)
+
+
+def environment_template() -> str:
+    """Render a dotenv template from field metadata, never from live settings."""
+    lines = [
+        "# Uncomment and edit the settings you need. Never commit credentials.",
+        "# CLI options override matching environment variables.",
+        "",
+    ]
+    for name, field in EnvironmentSettings.model_fields.items():
+        for line in (field.description or "").splitlines():
+            lines.append(f"# {line}")
+        default = field.default
+        if isinstance(default, bool):
+            value = str(default).lower()
+        elif isinstance(default, (int, float)):
+            value = str(default)
+        else:
+            value = ""
+        lines.extend((f"# {name}={value}", ""))
     return "\n".join(lines)

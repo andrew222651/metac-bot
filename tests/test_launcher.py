@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class LauncherTests(unittest.TestCase):
-    def test_only_top_level_cli_starts_the_service(self):
+    def test_launcher_does_not_start_shared_service(self):
         with TemporaryDirectory() as directory:
             base = Path(directory)
             log = base / "calls"
@@ -53,10 +53,8 @@ if [[ "${OPENROUTER_API_KEY:-}" == *'$('* ]]; then printf 'secret-forwarded\\n' 
                 text=True,
             )
             calls = log.read_text().splitlines()
-            self.assertIn("opencode service start", calls)
-            self.assertTrue(
-                any("registration=/test-state/service.json" in c for c in calls)
-            )
+            self.assertFalse(any(call.startswith("opencode ") for call in calls))
+            self.assertIn("registration=", calls)
             self.assertIn("secret-forwarded", calls)
             self.assertFalse((base / "injected").exists())
             self.assertNotIn(env["OPENROUTER_API_KEY"], "\n".join(calls))

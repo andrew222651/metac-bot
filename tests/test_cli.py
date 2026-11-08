@@ -1,4 +1,5 @@
 import os
+from typing import Any, cast
 import unittest
 from unittest.mock import patch
 
@@ -38,6 +39,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_invalid_options_fail_before_running(self):
         for argv in [
+            ["--mode", "metaculus_cup"],
             ["--timeout", "nan"],
             ["--timeout", "inf"],
             ["--api-timeout", "0"],
@@ -132,6 +134,8 @@ class ConfigTests(unittest.TestCase):
                 self.assertEqual(getattr(one_off, name), expected)
 
     def test_programmatic_config_is_validated(self):
+        with self.assertRaisesRegex(ValueError, "Invalid tournament mode"):
+            RunConfig(mode=cast(Any, "metaculus_cup"))
         with self.assertRaises(ValueError):
             RunConfig(ensemble_min_members=8)
         with self.assertRaises(ValueError):

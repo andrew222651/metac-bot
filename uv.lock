@@ -1688,7 +1688,6 @@ dev = [
 ]
 integrations = [
     { name = "lightningrod-ai" },
-    { name = "metaculus-bot-review" },
 ]
 
 [package.metadata]
@@ -1722,25 +1721,7 @@ dev = [
     { name = "ruff", specifier = ">=0.15,<0.16" },
     { name = "ty", specifier = ">=0.0.95,<0.1" },
 ]
-integrations = [
-    { name = "lightningrod-ai", specifier = ">=0.1.14,<0.2" },
-    { name = "metaculus-bot-review", specifier = ">=0.1.1,<0.2" },
-]
-
-[[package]]
-name = "metaculus-bot-review"
-version = "0.1.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "forecasting-tools" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "requests" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/be/b8/e428bbe8d1c373006008c44cf89e50d2a7a367316645b0da6978378ce454/metaculus_bot_review-0.1.2.tar.gz", hash = "sha256:6b59e6fdf246e711db95b5d719a4317b94da5b6c8c0f9cb267fb6c0510062798", size = 14206, upload-time = "2026-10-02T09:28:40.635Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/ad/95119ef3d0777a18076718131be649230fc02301634167469433b7e155e8/metaculus_bot_review-0.1.2-py3-none-any.whl", hash = "sha256:ce652c57ec29615c9ade7dd9423a6cc591ce1e755b224a4901bea0581379279d", size = 17290, upload-time = "2026-10-02T09:28:37.375Z" },
-]
+integrations = [{ name = "lightningrod-ai", specifier = ">=0.1.14,<0.2" }]
 
 [[package]]
 name = "minikanren"

@@ -14,7 +14,7 @@ def validate_model(model: str | None) -> None:
 
 @dataclass(frozen=True)
 class RunConfig:
-    mode: Literal["tournament", "metaculus_cup", "test_questions"] = "tournament"
+    mode: Literal["tournament", "test_questions"] = "tournament"
     dry_run: bool = False
     limit: int | None = None
     model: str | None = None
@@ -33,7 +33,7 @@ class RunConfig:
     ensemble_adjudicator_model: str | None = None
 
     def __post_init__(self):
-        if self.mode not in ("tournament", "metaculus_cup", "test_questions"):
+        if self.mode not in ("tournament", "test_questions"):
             raise ValueError("Invalid tournament mode")
         if (
             not math.isfinite(self.timeout)

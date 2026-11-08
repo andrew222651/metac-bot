@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from forecasting_tools import BinaryQuestion
 from metac_bot.forecasting.jobs import ROOT, create_job, read_report
-from metac_bot.infrastructure.opencode import OpenCode, discover_service
+from metac_bot.infrastructure.opencode_service import connect_for_run
 
 
 async def main():
@@ -19,8 +19,7 @@ async def main():
             background_info="A hypothetical fair coin, with no edge outcome, has equal probability of heads and tails.",
         )
     )
-    url, auth = discover_service()
-    async with OpenCode(url, auth) as client:
+    async with connect_for_run(api_timeout=30, startup_timeout=60) as client:
         session_id = await client.create_session(ROOT, "Forecast MCP smoke test")
         print(f"Session: {session_id}; job: {job_id}", flush=True)
         await client.prompt(

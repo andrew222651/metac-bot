@@ -10,9 +10,7 @@ import warnings
 from typing import Any, Sequence
 
 
-# Placeholder values shipped in .env.template. If a real env var still equals
-# one of these the user forgot to replace it; we'd rather fail loudly here than
-# inside the SDK three layers down.
+# Reject common placeholder values, including those used by older templates.
 _PLACEHOLDER_ENV_VALUES = {
     "1234567890",
     "REPLACE_ME",

@@ -1,10 +1,5 @@
-import asyncio
-import sys
 import unittest
 from pathlib import Path
-
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 
 from metac_bot.forecasting import jobs
 from metac_bot.forecasting.prompts import forecast_prompt, stage_prompt
@@ -41,37 +36,3 @@ class PackageStructureTests(unittest.TestCase):
         self.assertIn(
             "do not look it up on Metaculus", forecast_prompt("job-id", one_off=True)
         )
-
-
-class McpEntrypointTests(unittest.IsolatedAsyncioTestCase):
-    async def test_existing_mcp_launch_commands_expose_tools(self):
-        for module, expected in (
-            (
-                "metac_bot.mcp_server",
-                {
-                    "get_forecast_job",
-                    "record_forecast",
-                    "get_bayesian_stage",
-                    "record_bayesian_stage",
-                },
-            ),
-            (
-                "metac_bot.research_mcp",
-                {
-                    "available_providers",
-                    "asknews_research",
-                    "perplexity_research",
-                    "exa_search",
-                },
-            ),
-        ):
-            with self.subTest(module=module):
-                params = StdioServerParameters(
-                    command=sys.executable, args=["-m", module], cwd=ROOT
-                )
-                async with asyncio.timeout(60):
-                    async with stdio_client(params) as (reader, writer):
-                        async with ClientSession(reader, writer) as session:
-                            await session.initialize()
-                            result = await session.list_tools()
-                self.assertEqual({tool.name for tool in result.tools}, expected)

@@ -11,7 +11,7 @@ from cyclopts import App, Parameter
 from dotenv import load_dotenv
 
 from .config import ROLES, OneOffConfig, RunConfig
-from .environment import EnvironmentSettings, environment_help
+from .environment import EnvironmentSettings, environment_help, environment_template
 from .paths import ROOT
 
 app = App(
@@ -85,7 +85,7 @@ class CommonOptions:
     def run_config(
         self,
         *,
-        mode: Literal["tournament", "metaculus_cup", "test_questions"] = "tournament",
+        mode: Literal["tournament", "test_questions"] = "tournament",
         dry_run: bool = False,
         limit: int | None = None,
     ) -> RunConfig:
@@ -185,7 +185,7 @@ class CommonOptions:
 def build_config(
     *,
     mode: Annotated[
-        Literal["tournament", "metaculus_cup", "test_questions"],
+        Literal["tournament", "test_questions"],
         Parameter(help="Tournament to forecast on."),
     ] = "tournament",
     dry_run: Annotated[
@@ -196,6 +196,12 @@ def build_config(
 ) -> RunConfig:
     """Configure one tournament forecasting run."""
     return options.run_config(mode=mode, dry_run=dry_run, limit=limit)
+
+
+@app.command
+def generate_env() -> None:
+    """Print a commented .env template; redirect output to a new .env file."""
+    print(environment_template(), end="")
 
 
 @app.command

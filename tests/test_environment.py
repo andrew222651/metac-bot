@@ -1,3 +1,4 @@
+import io
 import os
 from pathlib import Path
 import subprocess
@@ -5,8 +6,13 @@ import sys
 import unittest
 from unittest.mock import patch
 
+from dotenv import dotenv_values
+
 from metac_bot.infrastructure.cli import parse_args
-from metac_bot.infrastructure.environment import EnvironmentSettings
+from metac_bot.infrastructure.environment import (
+    EnvironmentSettings,
+    environment_template,
+)
 
 
 class EnvironmentTests(unittest.TestCase):
@@ -86,6 +92,51 @@ class EnvironmentTests(unittest.TestCase):
                 )
                 for name in EnvironmentSettings.model_fields:
                     self.assertIn(name, result.stdout)
+
+    def test_generated_template_covers_settings_without_using_environment_values(self):
+        with patch.dict(
+            os.environ,
+            {
+                "OPENROUTER_API_KEY": "never-print-this-test-secret",
+                "METAC_BOT_SESSION_TIMEOUT": "invalid",
+            },
+            clear=True,
+        ):
+            template = environment_template()
+        self.assertNotIn("never-print-this-test-secret", template)
+        self.assertNotIn("invalid", template)
+        self.assertEqual(dotenv_values(stream=io.StringIO(template)), {})
+        for name, field in EnvironmentSettings.model_fields.items():
+            with self.subTest(name=name):
+                self.assertEqual(
+                    sum(
+                        line.startswith(f"# {name}=") for line in template.splitlines()
+                    ),
+                    1,
+                )
+                if field.description:
+                    self.assertIn(field.description, template)
+        self.assertIn("# METAC_BOT_SESSION_TIMEOUT=900", template)
+        self.assertIn("# METAC_BOT_SINGLE_AGENT=false", template)
+        self.assertIn("# METACULUS_TOKEN=", template)
+
+    def test_generate_env_command_prints_template_and_exits(self):
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [sys.executable, "-m", "metac_bot", "generate-env"],
+            cwd=root,
+            env={
+                **os.environ,
+                "OPENROUTER_API_KEY": "never-print-this-test-secret",
+                "METAC_BOT_SESSION_TIMEOUT": "invalid",
+            },
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+        self.assertEqual(result.stdout, environment_template())
+        self.assertNotIn("never-print-this-test-secret", result.stdout + result.stderr)
 
     def test_explicit_cli_value_overrides_an_invalid_environment_value(self):
         with patch.dict(

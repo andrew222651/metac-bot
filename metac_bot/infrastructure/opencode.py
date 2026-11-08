@@ -1,39 +1,12 @@
 """Small V2 HTTP client using the existing OpenCode service and its credentials."""
 
 import asyncio
-import json
-import os
 from pathlib import Path
-import subprocess
 import time
 
 import httpx
 
 from .models import model_reference
-
-
-def discover_service() -> tuple[str, httpx.BasicAuth | None]:
-    url = os.getenv("OPENCODE_SERVER_URL")
-    if url:
-        password = os.getenv("OPENCODE_SERVER_PASSWORD")
-        return url, httpx.BasicAuth(
-            os.getenv("OPENCODE_SERVER_USERNAME", "opencode"), password
-        ) if password else None
-    registration = os.getenv("OPENCODE_SERVICE_FILE")
-    if not registration:
-        subprocess.run(
-            ["opencode", "service", "start"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        state = subprocess.check_output(
-            ["opencode", "debug", "paths", "state"], text=True, timeout=30
-        ).strip()
-        registration = str(Path(state) / "service.json")
-    service = json.loads(Path(registration).read_text())
-    return service["url"], httpx.BasicAuth("opencode", service["password"])
 
 
 class OpenCode:

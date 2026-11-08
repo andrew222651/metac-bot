@@ -13,7 +13,7 @@ runs:
     - name: Install OpenCode V2
       shell: bash
       run: npm install --global @opencode/cli@2.0.27
-    - name: Start OpenCode
+    - name: Validate forecast settings
       shell: bash
       run: |
         if [[ -z "${OPENCODE_MODEL:-}" ]]; then
@@ -25,15 +25,6 @@ runs:
           random|exa|firecrawl|parallel|tavily|tinyfish) ;;
           *) printf 'Invalid OPENCODE_SEARCH_PROVIDER.\n' >&2; exit 1 ;;
         esac
-        config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
-        mkdir -p "$config_dir"
-        if [[ -e "$config_dir/opencode.json" || -e "$config_dir/opencode.jsonc" ]]; then
-          printf 'Refusing to replace an existing OpenCode configuration.\n' >&2
-          exit 1
-        fi
-        cp .github/opencode-ci.jsonc "$config_dir/opencode.jsonc"
-        opencode service start
-        opencode mcp list
     - name: Forecast
       shell: bash
       env:
@@ -46,7 +37,3 @@ runs:
         name: forecasts-${{ inputs.mode }}
         path: forecast_runs/
         if-no-files-found: ignore
-    - name: Stop OpenCode
-      if: always()
-      shell: bash
-      run: opencode service stop

@@ -33,7 +33,6 @@ dependencies = [
 [dependency-groups]
 integrations = [
     "lightningrod-ai>=0.1.14,<0.2",
-    "metaculus-bot-review>=0.1.1,<0.2",
 ]
 dev = [
     "ipykernel>=6.29.5,<7",

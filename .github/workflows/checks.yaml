@@ -25,5 +25,9 @@ jobs:
         run: uv run --locked --all-groups ruff check .
       - name: ty
         run: uv run --locked --all-groups ty check
-      - name: Tests
+      - name: Fast tests
+        id: fast_tests
         run: uv run --locked --all-groups python -m unittest discover -s tests -v
+      - name: Slow tests
+        if: ${{ !cancelled() && steps.fast_tests.outcome != 'skipped' }}
+        run: uv run --locked --all-groups python -m unittest discover -s tests/slow -v

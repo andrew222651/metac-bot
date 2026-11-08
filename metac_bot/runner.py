@@ -22,7 +22,7 @@ from .forecasting.jobs import (
 )
 from .forecasting.prompts import forecast_prompt
 from .infrastructure.config import OneOffConfig, RunConfig
-from .infrastructure.opencode import OpenCode, discover_service
+from .infrastructure.opencode import OpenCode
 from .infrastructure.opencode_service import connect_for_run
 from .infrastructure.runtime import (
     check_environment,
@@ -40,7 +40,6 @@ async def select_questions(metaculus, args: RunConfig):
             metaculus.CURRENT_AI_COMPETITION_ID,
             metaculus.CURRENT_MINIBENCH_ID,
         ],
-        "metaculus_cup": [metaculus.CURRENT_METACULUS_CUP_ID],
         "test_questions": ["bot-testing-area"],
     }[args.mode]
     questions = {}
@@ -146,7 +145,6 @@ async def run(args: RunConfig) -> int:
     async with connect_for_run(
         api_timeout=args.api_timeout,
         startup_timeout=args.service_start_timeout,
-        discover=discover_service,
         client_factory=OpenCode,
     ) as opencode:
         for question in selected:
@@ -181,7 +179,6 @@ async def run_one_off(args: OneOffConfig) -> int:
     async with connect_for_run(
         api_timeout=args.api_timeout,
         startup_timeout=args.service_start_timeout,
-        discover=discover_service,
         client_factory=OpenCode,
     ) as opencode:
         report = await forecast_question(opencode, None, question, args)

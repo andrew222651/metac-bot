@@ -1,37 +1,26 @@
-# OpenCode Metaculus forecasting bot
+An OpenCode-first bot for [Metaculus FutureEval](https://www.metaculus.com/futureeval/participate/).
 
-An OpenCode-first bot for [Metaculus FutureEval](https://www.metaculus.com/futureeval/participate/). OpenCode researches and forecasts; Python validates and publishes reports using `forecasting-tools`.
+Other open-source bots are listed [here](https://www.metaculus.com/notebooks/38928/futureeval-resources-page/#open-source-bots).
 
-## Install
 
-Install [OpenCode V2](https://opencode.ai/v2/docs/), then run from the repository:
+## Install in Termux
+
+Install [OpenCode V2](https://opencode.ai/v2/docs/) in Termux and clone your copy of this repository. From the repository directory, run:
 
 ```bash
 bash scripts/install.sh
 ```
 
-On **Termux**, the installer installs missing tools and creates a Debian Trixie container if needed, then installs Python and the locked dependencies there. It reuses existing containers and does not overwrite an incompatible Python installation. Set `METAC_BOT_VENV` to override the default `/root/.venvs/metac-bot` environment.
+The installer installs missing tools and creates a Debian Trixie container if needed, then installs Python and the locked dependencies there.
+Set `METAC_BOT_VENV` to override the default `/root/.venvs/metac-bot` environment.
 
-## Run locally
+Connect a model and search provider in OpenCode. Each forecast starts its own OpenCode server, loads the bot's agents, skills, and `metaculus` and `research` tools, and stops the server afterward. These are not added to your shared OpenCode server. If the tools fail to connect, check that installation completed and run the command from the repository directory.
 
-1. Copy `.env.template` to `.env` and set `METACULUS_TOKEN`.
-2. Connect a model and search provider in OpenCode, then start the service:
-   ```bash
-   opencode service start
-   opencode mcp list
-   ```
-3. Test one question **without publishing**:
-   ```bash
-   bash scripts/python.sh -m metac_bot --mode test_questions --limit 1 --dry-run
-   ```
+If the shared OpenCode server already loaded this project's tools before the change, run `opencode reload` from the repository after resolving any pending permission requests and forms; reload cancels them.
 
-CLI options override the matching environment variables; use `--help` to list them. With no explicit provider overrides, the bot uses your existing OpenCode service. An explicit `OPENROUTER_API_KEY` starts a private service with that key, without changing your saved OpenCode account. Other saved provider accounts are unavailable to that private service and need environment keys if used. Its session history is temporary, but forecast artifacts remain in `forecast_runs/`. An explicit `OPENCODE_SEARCH_PROVIDER` also uses a private service without changing your shared configuration. These overrides cannot be combined with `OPENCODE_SERVER_URL`.
+## Run a test or one-off forecast in Termux
 
-If OpenCode was already running before the project agents were added, run `opencode reload` so it discovers them. Reloading cancels pending permission requests and forms; resolve those first.
-
-### One-off forecast
-
-Forecast a question you supply directly, without a Metaculus token or publication:
+For a standalone question, use `forecast`. This saves locally, never publishes, and does not require a Metaculus token:
 
 ```bash
 bash scripts/python.sh -m metac_bot forecast \
@@ -40,57 +29,53 @@ bash scripts/python.sh -m metac_bot forecast \
   --model 'openrouter/openai/gpt-6.1-terra#low'
 ```
 
-Omit `--option` for a binary yes/no question. Add `--criteria` or `--background` when needed. Binary and multiple-choice questions use the full ensemble by default; `--single-agent` is an explicit cheaper alternative. This command always saves locally and never publishes.
+Omit `--option` for a binary yes/no question. Add `--criteria` or `--background` when needed. Binary and multiple-choice questions use the full ensemble by default; `--single-agent` is an explicit cheaper alternative.
 
-Both the one-off and tournament commands accept `--model`, per-role `--ensemble-model ROLE=PROVIDER/MODEL`, and `--ensemble-adjudicator-model`. Use `--timeout` (or `--session-timeout`) for the default session deadline, `--api-timeout` for OpenCode API requests, and `--ensemble-proposal-timeout`, `--ensemble-review-timeout`, or `--ensemble-decision-timeout` to override individual stages. Corresponding `METAC_BOT_*` environment variables work on both Termux and GitHub Actions. See `--help` for their names and defaults. MCP and research-provider timeouts are configured separately in OpenCode.
-
-### Forecast modes
+To test against one question from the Metaculus testing area **without publishing**, generate a configuration file if you do not already have one:
 
 ```bash
-# AI tournament and MiniBench; skips previously forecast questions
-bash scripts/python.sh -m metac_bot --mode tournament
-
-# Metaculus Cup
-bash scripts/python.sh -m metac_bot --mode metaculus_cup
-
-# Testing area
-bash scripts/python.sh -m metac_bot --mode test_questions
+bash scripts/python.sh -m metac_bot generate-env > .env
 ```
 
-**These commands publish unless `--dry-run` is included.** Use `--limit N` to restrict questions and `--help` for model, timeout, and ensemble options. Permission requests are not auto-approved; a blocked session is interrupted and reported. A failed publication may already have submitted a prediction before its comment failed, so check Metaculus before retrying.
-
-## GitHub Actions
-
-Add repository secrets for `METACULUS_TOKEN` and at least one of `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`. Add a search key such as `EXA_API_KEY` or `TAVILY_API_KEY`; optional AskNews and Perplexity credentials are listed in `.env.template`.
-
-Optionally set repository variables `OPENCODE_MODEL`, `OPENCODE_SEARCH_PROVIDER`, `METAC_BOT_SESSION_TIMEOUT`, and `METAC_BOT_ENSEMBLE_CONCURRENCY`. Manual workflow inputs override those variables. Without a model variable, CI chooses a default from the available provider keys; search defaults to `random`. The CI-only OpenCode template reads its search setting from the environment and does not change your local OpenCode configuration.
-
-Run **Test Bot** manually first. It publishes to the testing area. The AI tournament workflow runs every 20 minutes, and the Cup workflow every two days. Workflows install OpenCode and dependencies, then upload `forecast_runs/` as artifacts.
-
-## How it works
-
-- **Binary and multiple-choice questions:** seven independent sessions propose priors and evidence. An adjudicator groups evidence and estimates conditional likelihoods; Python computes a shared posterior across all outcomes. Agents review it, and the bot publishes only if the convergence and quorum checks pass. The economic and causal modelers must both participate.
-- **Other question types:** a single agent forecasts numeric, date, and conditional questions.
-- **Research:** OpenCode's web tools and optional AskNews, Perplexity, and Exa MCP tools provide sources. AskNews and Perplexity perform their own provider-side generation; OpenCode produces the final forecast.
-
-The Bayesian likelihoods and dependence assumptions are model judgments, not guaranteed calibration. Repeated reports and correlated evidence can still be difficult to identify. An ensemble question can require **16 or more model sessions**, with corresponding time and cost.
-
-The modeling agents can run Python with NumPy, SciPy, SymPy, pandas, statsmodels, NetworkX, and PyMC. Shell execution requires permission and is **not sandboxed**. On Termux/PRoot, PyTensor defaults to a slower non-C-compiled mode; set `PYTENSOR_FLAGS` to override it if a suitable Linux compiler and headers are available.
-
-Reports, model artifacts, and session IDs are stored in `forecast_runs/` (ignored by Git). Agent definitions and skills live in `.opencode/`; MCP servers are configured in `opencode.jsonc` and implemented in `metac_bot/`.
-
-Python forecasting behavior lives in `metac_bot/forecasting/` (roles, prompts, ensemble, validation, and MCP tools). Runtime interfaces and adapters live in `metac_bot/infrastructure/` (CLI, configuration, OpenCode, and research services). `metac_bot/runner.py` connects the two and handles question selection and publication. The `python -m metac_bot` and existing MCP entry points remain unchanged.
-
-## Development
+The command prints a template generated from the settings; the redirection creates `.env` and **overwrites it if it already exists**. Uncomment and set `METACULUS_TOKEN` in `.env`, then run:
 
 ```bash
-# Include optional integrations and development tools
-bash scripts/install.sh --all-groups
-
-bash scripts/python.sh -m unittest discover -s tests -v
-bash scripts/python.sh -m ruff format --check .
-bash scripts/python.sh -m ruff check .
-bash scripts/python.sh -m ty check
+bash scripts/python.sh -m metac_bot --mode test_questions --limit 1 --dry-run
 ```
 
-Ruff, ty, and the unit tests run on push. See [integrations/README.md](integrations/README.md) for LightningRod and bot-review.
+Remove `--dry-run` only if you want to publish to the testing area. Reports and session artifacts are saved in `forecast_runs/`. Forecasting can incur model and research costs; an ensemble forecast can require 16 or more model sessions. Shell execution requires permission and is **not sandboxed**.
+
+CLI options override matching environment variables. The private server normally uses your saved OpenCode provider accounts. An explicit `OPENROUTER_API_KEY` uses an isolated account database without changing your saved account; other saved provider accounts are unavailable to it and need environment keys if used. In that case, session history is temporary, but forecast artifacts remain in `forecast_runs/`. An explicit `OPENCODE_SEARCH_PROVIDER` applies only to the private server.
+
+## Configure secrets in GitHub
+
+In your repository, open **Settings → Secrets and variables → Actions → Secrets** and add:
+
+- `METACULUS_TOKEN` for the Metaculus bot account.
+- At least one model provider key: `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`.
+- A key for the search provider you use, such as `EXA_API_KEY` or `TAVILY_API_KEY`. Optional AskNews and Perplexity credentials and other search keys are listed in the generated environment template and CLI help.
+
+For manually started workflows, the model, search provider, session timeout, and ensemble concurrency inputs override the corresponding repository variables. A blank input, or `configured` for search, falls back to the variable. Scheduled runs have no inputs and use the variables directly. If a variable is not set, the workflow uses the fallback below. Credentials always come from repository secrets, not dispatch inputs.
+
+Set optional variables under **Settings → Secrets and variables → Actions → Variables**:
+
+| Setting | Repository variable | Fallback |
+| --- | --- | --- |
+| Model | `OPENCODE_MODEL` | Chosen from available provider keys, in OpenRouter, OpenAI, then Anthropic order |
+| Search provider | `OPENCODE_SEARCH_PROVIDER` | `random` |
+| Session timeout | `METAC_BOT_SESSION_TIMEOUT` | `900` seconds |
+| Ensemble concurrency | `METAC_BOT_ENSEMBLE_CONCURRENCY` | `2` |
+
+The model fallbacks are `openrouter/openai/gpt-4.1-mini`, `openai/gpt-4.1-mini`, and `anthropic/claude-sonnet-4-5`, respectively. Without a model input or variable and without any of those provider keys, the workflow fails.
+
+## Run a test forecast in GitHub Actions
+
+After configuring secrets, open **Actions → Run bot → Run workflow**, choose a branch, and select `test_questions` (the default). Optionally set the model, search provider, session timeout, or ensemble concurrency, and start the run. Download the `forecasts-test_questions` artifact from the completed run for its reports and session artifacts.
+
+**The test mode publishes forecasts and comments to the Metaculus testing area.** The workflow does not accept a custom one-off question or offer a dry-run input. For a private, user-supplied forecast, use the Termux one-off command above.
+
+## Participate in a Metaculus competition in GitHub Actions
+
+After configuring secrets, open **Actions → Run bot**. Scheduled runs forecast on the AI tournament and MiniBench every 20 minutes, skipping questions already forecast. To start a competition run manually, choose **Run workflow** and select `tournament`; the manual default is the testing area.
+
+The workflow publishes forecasts and comments, installs OpenCode and dependencies, and uploads `forecast_runs/` as an artifact. Disable it in GitHub Actions if you do not want it to run automatically. If publication fails, check Metaculus before retrying because a prediction may have been submitted before its comment failed.

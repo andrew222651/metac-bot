@@ -1,4 +1,4 @@
-"""Connect to the shared service or isolate explicit provider overrides."""
+"""Start and stop a private OpenCode server for each forecasting run."""
 
 import asyncio
 from contextlib import asynccontextmanager
@@ -15,25 +15,10 @@ import json5
 
 from .environment import ConnectionSettings
 from .paths import ROOT
-from .opencode import OpenCode, discover_service
+from .opencode import OpenCode
 from .runtime import is_real_env
 
 logger = logging.getLogger(__name__)
-
-SERVICE_ENVIRONMENT = (
-    "OPENAI_API_KEY",
-    "ANTHROPIC_API_KEY",
-    "EXA_API_KEY",
-    "TAVILY_API_KEY",
-    "FIRECRAWL_API_KEY",
-    "PARALLEL_API_KEY",
-    "TINYFISH_API_KEY",
-    "ASKNEWS_API_KEY",
-    "ASKNEWS_CLIENT_ID",
-    "ASKNEWS_SECRET",
-    "ASKNEWS_CACHE_MODE",
-    "PERPLEXITY_API_KEY",
-)
 
 
 def _copy_config(
@@ -65,8 +50,6 @@ def _copy_config(
         )
     else:
         destination.mkdir()
-    if search_provider is None:
-        return
     path = destination / "opencode.jsonc"
     try:
         config = (
@@ -78,7 +61,16 @@ def _copy_config(
         raise RuntimeError(
             "Cannot read the OpenCode configuration for the private server"
         ) from None
-    config["websearch"] = {"provider": search_provider}
+    mcp = json5.loads((ROOT / "metac_bot/opencode-mcp.jsonc").read_text())
+    config.setdefault("mcp", {}).setdefault("servers", {}).update(mcp["mcp"]["servers"])
+    bot_config = ROOT / "metac_bot/forecasting/opencode"
+    shutil.copytree(bot_config / "agents", destination / "agents", dirs_exist_ok=True)
+    skills_path = str(bot_config / "skills")
+    skills = config.setdefault("skills", [])
+    if skills_path not in skills:
+        skills.append(skills_path)
+    if search_provider is not None:
+        config["websearch"] = {"provider": search_provider}
     path.write_text(json.dumps(config, indent=2), encoding="utf-8")
 
 
@@ -131,15 +123,46 @@ async def _verify_search(client: OpenCode, provider: str) -> None:
         )
 
 
+async def _wait_for_mcp(client: OpenCode, timeout: float) -> None:
+    """Wait until the bot's tools are ready before starting an agent session."""
+    required = {"metaculus", "research"}
+    try:
+        async with asyncio.timeout(timeout):
+            while True:
+                response = await client.request(
+                    "GET", "/api/mcp", params={"location[directory]": str(ROOT)}
+                )
+                statuses = {
+                    item["name"]: item["status"]["status"]
+                    for item in response.get("data", [])
+                    if item.get("name") in required
+                }
+                failed = {
+                    name: status
+                    for name, status in statuses.items()
+                    if status not in ("connected", "pending")
+                }
+                if failed:
+                    raise RuntimeError(
+                        f"Forecast MCP servers failed to connect: {failed}"
+                    )
+                if all(statuses.get(name) == "connected" for name in required):
+                    return
+                await asyncio.sleep(0.5)
+    except TimeoutError as exc:
+        raise TimeoutError(
+            "Forecast MCP servers did not connect before the startup deadline"
+        ) from exc
+
+
 @asynccontextmanager
 async def connect_for_run(
     *,
     api_timeout: float,
     startup_timeout: float,
-    discover=discover_service,
     client_factory=OpenCode,
 ):
-    """Apply explicit overrides privately; otherwise use the user's shared service."""
+    """Run an authenticated private server and clean it up after the forecast."""
     settings = ConnectionSettings()
     key = (
         settings.OPENROUTER_API_KEY.get_secret_value()
@@ -147,21 +170,6 @@ async def connect_for_run(
         else None
     )
     search = settings.OPENCODE_SEARCH_PROVIDER
-    service_environment = any(is_real_env(name) for name in SERVICE_ENVIRONMENT)
-    if not key and not search and not service_environment:
-        url, auth = discover()
-        async with client_factory(url, auth, timeout=api_timeout) as client:
-            yield client
-        return
-    if settings.OPENCODE_SERVER_URL:
-        raise ValueError(
-            "Explicit provider/search environment settings cannot be applied to OPENCODE_SERVER_URL without modifying that server; use the local service instead"
-        )
-    if not key and settings.OPENCODE_DB == ":memory:":
-        raise ValueError(
-            "A private search override cannot reuse a shared in-memory OpenCode database"
-        )
-
     config_home = Path(
         settings.METAC_BOT_HOST_CONFIG_HOME
         or settings.XDG_CONFIG_HOME
@@ -176,6 +184,13 @@ async def connect_for_run(
         temp = Path(directory)
         _copy_config(config_home, temp / "config", search)
         env = os.environ.copy()
+        for name in (
+            "OPENCODE_SERVER_URL",
+            "OPENCODE_SERVER_USERNAME",
+            "OPENCODE_SERVER_PASSWORD",
+            "OPENCODE_SERVICE_FILE",
+        ):
+            env.pop(name, None)
         env["XDG_CONFIG_HOME"] = str(temp / "config")
         env["XDG_STATE_HOME"] = str(temp / "state")
         if key:
@@ -187,9 +202,7 @@ async def connect_for_run(
             )
         else:
             env["XDG_DATA_HOME"] = str(data_home)
-            logger.info(
-                "Using a private OpenCode server for explicit provider/search environment settings"
-            )
+            logger.info("Using a private OpenCode server for this run")
         process = await asyncio.create_subprocess_exec(
             "opencode",
             "serve",
@@ -224,6 +237,7 @@ async def connect_for_run(
                         )
                 if search:
                     await _verify_search(client, search)
+                await _wait_for_mcp(client, startup_timeout)
                 yield client
         finally:
             if process.returncode is None:

@@ -34,33 +34,15 @@ class ModelingEnvironmentTests(unittest.TestCase):
         )
         self.assertTrue(nx.is_directed_acyclic_graph(graph))
 
-    def test_launcher_uses_the_scientific_environment(self):
-        root = Path(__file__).resolve().parents[1]
-        command = [
-            "bash",
-            "scripts/python.sh",
-            "-c",
-            "import numpy, scipy, sympy, pandas, statsmodels, networkx, pymc; print('modeling-ready')",
-        ]
-        # The parent uv invocation already synced the environment; do not let
-        # a nested uv run uninstall optional integration groups during tests.
-        environment = {**os.environ, "UV_NO_SYNC": "1"}
-        result = subprocess.run(
-            command,
-            cwd=root,
-            env=environment,
-            capture_output=True,
-            text=True,
-            timeout=90,
-            check=True,
-        )
-        self.assertEqual(result.stdout.strip(), "modeling-ready")
 
-    def test_pymc_samples_a_small_model_through_launcher(self):
-        root = Path(__file__).resolve().parents[1]
+class ModelingLauncherTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
         code = """
+import numpy, scipy, sympy, pandas, statsmodels, networkx
 import pymc as pm
 import numpy as np
+print('modeling-ready', flush=True)
 with pm.Model():
     p = pm.Beta('p', alpha=2, beta=2)
     pm.Binomial('observed', n=4, p=p, observed=3)
@@ -77,13 +59,29 @@ print('pymc-ready')
             "OPENBLAS_NUM_THREADS": "1",
             "OMP_NUM_THREADS": "1",
         }
-        result = subprocess.run(
+        # Graph optimization is disproportionately slow in PRoot without C.
+        # Keep the same NUTS model and draws; native CI uses the normal optimizer.
+        # Set METAC_BOT_TEST_FULL_PYTENSOR=1 to exercise the full Termux default.
+        if (
+            os.environ.get("PD_CONTAINER")
+            and os.environ.get("ANDROID_ROOT")
+            and environment.get("PYTENSOR_FLAGS") == "cxx="
+            and os.environ.get("METAC_BOT_TEST_FULL_PYTENSOR") != "1"
+        ):
+            environment["PYTENSOR_FLAGS"] = "cxx=,optimizer=fast_compile"
+        # Avoid nested uv synchronization removing optional test dependencies.
+        cls.result = subprocess.run(
             ["bash", "scripts/python.sh", "-c", code],
-            cwd=root,
+            cwd=Path(__file__).resolve().parents[2],
             env=environment,
             capture_output=True,
             text=True,
             timeout=180,
-            check=True,
         )
-        self.assertIn("pymc-ready", result.stdout)
+
+    def test_launcher_uses_the_scientific_environment(self):
+        self.assertIn("modeling-ready", self.result.stdout, self.result.stderr)
+
+    def test_pymc_samples_a_small_model_through_launcher(self):
+        self.assertEqual(self.result.returncode, 0, self.result.stderr)
+        self.assertIn("pymc-ready", self.result.stdout)
