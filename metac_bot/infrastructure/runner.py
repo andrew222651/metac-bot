@@ -13,20 +13,20 @@ from forecasting_tools import (
     PredictedOptionList,
 )
 
-from .forecasting.agent import run_agent
-from .forecasting.ensemble import run_ensemble
-from .forecasting.jobs import (
+from ..forecasting.implementation.agent import run_agent
+from ..forecasting.implementation.jobs import (
     create_job,
     job_path,
     read_report,
     save_forecast,
     write_json,
 )
-from .forecasting.prompts import forecast_prompt
-from .infrastructure.config import OneOffConfig, RunConfig
-from .infrastructure.opencode import OpenCode
-from .infrastructure.opencode_service import connect_for_run
-from .infrastructure.runtime import (
+from ..forecasting.strategy.prompts import forecast_prompt
+from ..forecasting.strategy.workflow import run_ensemble, uses_ensemble
+from .config import OneOffConfig, RunConfig
+from .opencode import OpenCode
+from .opencode_service import connect_for_run
+from .runtime import (
     check_environment,
     print_run_summary_banner,
     print_startup_banner,
@@ -70,10 +70,7 @@ async def forecast_question(
     job_id = create_job(question)
     session_id = None
     try:
-        if (
-            isinstance(question, (BinaryQuestion, MultipleChoiceQuestion))
-            and not args.single_agent
-        ):
+        if uses_ensemble(question, single_agent=args.single_agent):
             logger.info("Bayesian ensemble for %s: job=%s", question.page_url, job_id)
             result = await run_ensemble(
                 opencode,

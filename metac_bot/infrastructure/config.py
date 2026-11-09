@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import math
 from typing import Literal
 
-from ..forecasting.roles import ROLES
+from ..forecasting.strategy.roles import ROLES
 from .models import model_reference
 
 

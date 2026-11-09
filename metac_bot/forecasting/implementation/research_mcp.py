@@ -6,19 +6,12 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-from ..infrastructure import research
-from ..infrastructure.paths import ROOT
+from ...infrastructure import research
+from ...infrastructure.paths import ROOT
+from ..strategy.research import RESEARCH_INSTRUCTIONS
 
 load_dotenv(ROOT / ".env")
-mcp = FastMCP(
-    "research",
-    instructions=(
-        "Optional research providers. Call available_providers to check configuration. "
-        "Load the forecasting-research skill for source selection and synthesis. "
-        "AskNews and Perplexity return provider-generated research; verify cited sources. "
-        "Exa returns source text for OpenCode to synthesize."
-    ),
-)
+mcp = FastMCP("research", instructions=RESEARCH_INSTRUCTIONS)
 Query = Annotated[str, Field(min_length=1, max_length=12000)]
 
 

@@ -262,7 +262,7 @@ def main() -> None:
         logging.getLogger("forecasting_tools.helpers.metaculus_client").setLevel(
             logging.ERROR
         )
-    from ..runner import run, run_one_off
+    from .runner import run, run_one_off
 
     result = run_one_off(config) if isinstance(config, OneOffConfig) else run(config)
     raise SystemExit(asyncio.run(result))

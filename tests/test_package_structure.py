@@ -1,9 +1,10 @@
 import unittest
 from pathlib import Path
 
-from metac_bot.forecasting import jobs
-from metac_bot.forecasting.prompts import forecast_prompt, stage_prompt
-from metac_bot.forecasting.roles import MODEL_ROLES, ROLES
+from metac_bot.forecasting.implementation import jobs
+from metac_bot.forecasting.strategy.prompts import forecast_prompt, stage_prompt
+from metac_bot.forecasting.strategy.roles import MODEL_ROLES, ROLES
+from metac_bot.infrastructure import runner
 from metac_bot.infrastructure.paths import ROOT
 
 
@@ -12,6 +13,9 @@ class PackageStructureTests(unittest.TestCase):
         self.assertEqual(ROOT, Path(__file__).resolve().parents[1])
         self.assertEqual(jobs.ROOT, ROOT)
         self.assertEqual(jobs.JOBS, ROOT / "forecast_runs")
+        self.assertEqual(
+            Path(runner.__file__).resolve(), ROOT / "metac_bot/infrastructure/runner.py"
+        )
 
     def test_prompts_preserve_role_and_standalone_instructions(self) -> None:
         self.assertEqual(set(MODEL_ROLES), {"economic-modeler", "causal-modeler"})

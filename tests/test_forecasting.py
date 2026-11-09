@@ -11,8 +11,8 @@ from forecasting_tools import (
     MultipleChoiceQuestion,
     NumericQuestion,
 )
-from metac_bot.forecasting.domain import build_prediction, load_question
-from metac_bot.forecasting import jobs
+from metac_bot.forecasting.implementation.domain import build_prediction, load_question
+from metac_bot.forecasting.implementation import jobs
 
 
 class ForecastValidationTests(unittest.TestCase):

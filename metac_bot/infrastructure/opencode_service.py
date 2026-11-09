@@ -64,7 +64,7 @@ def _copy_config(
         ) from None
     mcp = json5.loads((ROOT / "metac_bot/opencode-mcp.jsonc").read_text())
     config.setdefault("mcp", {}).setdefault("servers", {}).update(mcp["mcp"]["servers"])
-    bot_config = ROOT / "metac_bot/forecasting/opencode"
+    bot_config = ROOT / "metac_bot/forecasting/strategy/opencode"
     shutil.copytree(bot_config / "agents", destination / "agents", dirs_exist_ok=True)
     skills_path = str(bot_config / "skills")
     skills = config.setdefault("skills", [])

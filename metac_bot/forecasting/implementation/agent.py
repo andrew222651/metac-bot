@@ -3,9 +3,9 @@
 from datetime import datetime, timezone
 from typing import Callable
 
-from ..infrastructure.opencode import OpenCode
-from ..infrastructure.paths import ROOT
-from .principles import SUPERFORECASTING_PRINCIPLES
+from ...infrastructure.opencode import OpenCode
+from ...infrastructure.paths import ROOT
+from ..strategy.principles import SUPERFORECASTING_PRINCIPLES
 
 
 async def run_agent(

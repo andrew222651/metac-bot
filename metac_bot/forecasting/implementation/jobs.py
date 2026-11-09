@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from forecasting_tools import ForecastReport, MetaculusQuestion
 
-from ..infrastructure.paths import ROOT
+from ...infrastructure.paths import ROOT
 from .domain import build_report, load_question, prediction_schema
 
 JOBS = ROOT / "forecast_runs"

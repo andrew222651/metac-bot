@@ -73,7 +73,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(set(servers), {"metaculus", "research"})
                 config = json.loads(config_path.read_text())
                 self.assertIn(
-                    str(ROOT / "metac_bot/forecasting/opencode/skills"),
+                    str(ROOT / "metac_bot/forecasting/strategy/opencode/skills"),
                     config["skills"],
                 )
                 for name in ("causal-modeler", "economic-modeler"):
@@ -81,7 +81,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
                         (config_path.parent / "agents" / f"{name}.md").read_bytes(),
                         (
                             ROOT
-                            / "metac_bot/forecasting/opencode/agents"
+                            / "metac_bot/forecasting/strategy/opencode/agents"
                             / f"{name}.md"
                         ).read_bytes(),
                     )
@@ -375,10 +375,14 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 (copied / "agents/causal-modeler.md").read_bytes(),
                 (
-                    ROOT / "metac_bot/forecasting/opencode/agents/causal-modeler.md"
+                    ROOT
+                    / "metac_bot/forecasting/strategy/opencode/agents/causal-modeler.md"
                 ).read_bytes(),
             )
             self.assertEqual(
                 json.loads((copied / "opencode.jsonc").read_text())["skills"],
-                ["/user/skills", str(ROOT / "metac_bot/forecasting/opencode/skills")],
+                [
+                    "/user/skills",
+                    str(ROOT / "metac_bot/forecasting/strategy/opencode/skills"),
+                ],
             )

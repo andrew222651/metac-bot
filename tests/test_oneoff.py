@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, patch
 
 from forecasting_tools import BinaryReport, MultipleChoiceQuestion, MultipleChoiceReport
 
-from metac_bot import runner
-from metac_bot.forecasting import jobs
+from metac_bot.infrastructure import runner
+from metac_bot.forecasting.implementation import jobs
 from metac_bot.infrastructure.cli import parse_args
 from metac_bot.infrastructure.config import OneOffConfig
 

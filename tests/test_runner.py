@@ -4,10 +4,10 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from forecasting_tools import BinaryQuestion, BinaryReport
-from metac_bot import runner as main
-from metac_bot.forecasting import jobs
+from metac_bot.infrastructure import runner as main
+from metac_bot.forecasting.implementation import jobs
 from metac_bot.infrastructure.config import RunConfig
-from metac_bot.forecasting.principles import SUPERFORECASTING_PRINCIPLES
+from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
 
 
 class RunnerTests(unittest.IsolatedAsyncioTestCase):
