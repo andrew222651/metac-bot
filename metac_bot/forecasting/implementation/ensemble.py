@@ -124,16 +124,27 @@ class EnsembleRunner:
                     )
                     self.persist()
 
-                session = await run_agent(
-                    self.opencode,
-                    title=f"Bayesian {stage}: {label}",
-                    model=model,
-                    timeout=timeout,
-                    on_session=record_session,
-                    agent=agent,
-                    prompt=self._prompt(stage, label, stage_id),
-                )
-                result = read_stage(stage_id)
+                try:
+                    session = await run_agent(
+                        self.opencode,
+                        title=f"Bayesian {stage}: {label}",
+                        model=model,
+                        timeout=timeout,
+                        on_session=record_session,
+                        agent=agent,
+                        prompt=self._prompt(stage, label, stage_id),
+                    )
+                except TimeoutError as timeout_error:
+                    if "session_id" not in entry:
+                        raise
+                    try:
+                        result = read_stage(stage_id)
+                    except Exception:
+                        raise timeout_error from None
+                    session = entry["session_id"]
+                    entry["timeout_recovered"] = True
+                else:
+                    result = read_stage(stage_id)
                 entry.update(status="complete", result=result)
                 self.persist()
                 return {

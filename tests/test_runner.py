@@ -14,6 +14,59 @@ from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLE
 
 
 class RunnerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_single_agent_recovers_valid_forecast_on_timeout(self) -> None:
+        question = BinaryQuestion(question_text="Synthetic")
+        client = AsyncMock()
+        client.create_session.return_value = "ses_test"
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+        ):
+
+            async def record_then_timeout(*args: object) -> None:
+                job_id = next(Path(directory).iterdir()).name
+                jobs.save_forecast(job_id, {"probability": 0.4}, "Research", "Reason")
+                raise TimeoutError("session expired")
+
+            client.wait.side_effect = record_then_timeout
+            result = await main.forecast_question(
+                client, None, question, RunConfig(single_agent=True, dry_run=True, timeout=10)
+            )
+            self.assertIsInstance(result, BinaryReport)
+            job_id = next(Path(directory).iterdir()).name
+            session = jobs.read_json(jobs.job_path(job_id) / "session.json")
+            self.assertTrue(session["timeout_recovered"])
+            self.assertIn(
+                "session time budget is 10 seconds", client.prompt.await_args.args[1]
+            )
+
+    async def test_single_agent_timeout_without_valid_forecast_fails(self) -> None:
+        for malformed in (False, True):
+            with (
+                self.subTest(malformed=malformed),
+                TemporaryDirectory() as directory,
+                patch.object(jobs, "JOBS", Path(directory)),
+            ):
+                client = AsyncMock()
+                client.create_session.return_value = "ses_test"
+
+                async def timeout(*args: object) -> None:
+                    if malformed:
+                        job_id = next(Path(directory).iterdir()).name
+                        jobs.write_json(
+                            jobs.job_path(job_id) / "forecast.json", {"prediction": {}}
+                        )
+                    raise TimeoutError("session expired")
+
+                client.wait.side_effect = timeout
+                result = await main.forecast_question(
+                    client,
+                    None,
+                    BinaryQuestion(question_text="Synthetic"),
+                    RunConfig(single_agent=True, dry_run=True),
+                )
+                self.assertIsInstance(result, TimeoutError)
+
     async def test_numeric_default_ensemble_reaches_publication(self) -> None:
         question = NumericQuestion(
             question_text="How many?",

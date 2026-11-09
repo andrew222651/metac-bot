@@ -28,6 +28,9 @@ async def run_agent(
         session_id,
         (
             f"{prompt}\nToday is {datetime.now(timezone.utc).isoformat()}.\n\n"
+            f"Your session time budget is {timeout:g} seconds. Prioritize completing "
+            "and recording a valid result within this budget; limit research and "
+            "calculations as needed and report remaining limitations honestly.\n\n"
             + SUPERFORECASTING_PRINCIPLES
         ),
     )

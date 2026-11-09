@@ -23,7 +23,7 @@ from metac_bot.forecasting.implementation.bayesian import (
     validate_stage,
 )
 from metac_bot.forecasting.implementation.bayesian_jobs import get_stage, record_stage
-from metac_bot.forecasting.implementation.ensemble import EnsembleSettings
+from metac_bot.forecasting.implementation.ensemble import EnsembleRunner, EnsembleSettings
 from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
 from metac_bot.forecasting.strategy.workflow import run_ensemble
 
@@ -358,6 +358,88 @@ class FakeOpenCode:
 
 
 class EnsembleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_recorded_stages_survive_session_timeout(self) -> None:
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+        ):
+            question = BinaryQuestion(question_text="Synthetic")
+            job_id = jobs.create_job(question)
+            client = FakeOpenCode()
+            original_wait = client.wait
+
+            async def recorded_then_timeout(session: str, timeout: float) -> None:
+                await original_wait(session, timeout)
+                if client.sessions[session]["title"].endswith("generalist"):
+                    raise TimeoutError("session expired")
+
+            with patch.object(client, "wait", side_effect=recorded_then_timeout):
+                result = await run_ensemble(client, question, job_id, timeout=10)
+            self.assertAlmostEqual(result["prediction"]["probability"], 1 / 3)
+            artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+            recovered = [
+                stage for stage in artifact["stages"] if stage.get("timeout_recovered")
+            ]
+            self.assertEqual(
+                {stage["stage"] for stage in recovered}, {"proposal", "review"}
+            )
+            self.assertTrue(all(stage["status"] == "complete" for stage in recovered))
+            self.assertTrue(
+                all("session time budget is 10 seconds" in prompt for prompt in client.prompts)
+            )
+
+    async def test_timeout_without_valid_stage_does_not_count(self) -> None:
+        for malformed in (False, True):
+            with (
+                self.subTest(malformed=malformed),
+                TemporaryDirectory() as directory,
+                patch.object(jobs, "JOBS", Path(directory)),
+            ):
+                question = BinaryQuestion(question_text="Synthetic")
+                client = FakeOpenCode()
+                runner = EnsembleRunner(
+                    client, question, jobs.create_job(question), EnsembleSettings()
+                )
+
+                async def timeout(session: str, seconds: float) -> None:
+                    if malformed:
+                        stage_id = client.sessions[session]["stage_id"]
+                        jobs.write_json(
+                            jobs.job_path(stage_id) / "stage_result.json", {"posterior": {}}
+                        )
+                    raise TimeoutError("session expired")
+
+                with patch.object(client, "wait", side_effect=timeout):
+                    result = await runner.run_stage(
+                        "proposal", "generalist", {"role": "generalist"}
+                    )
+                self.assertIsNone(result)
+                self.assertEqual(runner.artifacts["stages"][0]["status"], "failed")
+                self.assertIn("TimeoutError", runner.artifacts["stages"][0]["error"])
+
+    async def test_non_timeout_failure_does_not_recover_recorded_stage(self) -> None:
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+        ):
+            question = BinaryQuestion(question_text="Synthetic")
+            client = FakeOpenCode()
+            runner = EnsembleRunner(
+                client, question, jobs.create_job(question), EnsembleSettings()
+            )
+            original_wait = client.wait
+
+            async def failed_after_record(session: str, timeout: float) -> None:
+                await original_wait(session, timeout)
+                raise RuntimeError("permission required")
+
+            with patch.object(client, "wait", side_effect=failed_after_record):
+                result = await runner.run_stage(
+                    "proposal", "generalist", {"role": "generalist"}
+                )
+            self.assertIsNone(result)
+            self.assertEqual(runner.artifacts["stages"][0]["status"], "failed")
+
     async def test_revisions_are_pooled_and_prior_reviews_are_shared(self) -> None:
         with (
             TemporaryDirectory() as directory,

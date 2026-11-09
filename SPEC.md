@@ -64,6 +64,17 @@ assumptions, uncertainty, limitations, and whether computations actually ran.
 Every forecasting agent's prompt includes a summary of superforecasting principles.
 
 
+## Time limits
+
+Each agent session has a configurable time limit. Agents are told their budget and
+should prioritize recording a valid result before it expires, while reporting
+incomplete research and other limitations honestly. A recorded result can be
+used if the session subsequently times out; without one, that session fails.
+The ensemble still requires convergence.
+The session limit is not a deadline for the entire ensemble: queueing, multiple
+rounds, service calls, and interruption add time beyond an individual session.
+
+
 ## Ensemble aggregation and review
 
 Each proposing agent supplies its prior and posterior distributions, reasons for

@@ -101,14 +101,29 @@ async def forecast_question(
                     "Question %s: job=%s session=%s", question.page_url, job_id, value
                 )
 
-            await run_agent(
-                opencode,
-                title=f"Forecast: {question.question_text[:100]}",
-                model=args.model,
-                timeout=args.timeout,
-                on_session=record_session,
-                prompt=forecast_prompt(job_id, one_off=isinstance(args, OneOffConfig)),
-            )
+            try:
+                await run_agent(
+                    opencode,
+                    title=f"Forecast: {question.question_text[:100]}",
+                    model=args.model,
+                    timeout=args.timeout,
+                    on_session=record_session,
+                    prompt=forecast_prompt(job_id, one_off=isinstance(args, OneOffConfig)),
+                )
+            except TimeoutError as timeout_error:
+                if session_id is None:
+                    raise
+                try:
+                    read_report(job_id)
+                except Exception:
+                    raise timeout_error from None
+                write_json(
+                    job_path(job_id) / "session.json",
+                    {"session_id": session_id, "timeout_recovered": True},
+                )
+                logger.warning(
+                    "Using recorded forecast after session %s timed out", session_id
+                )
         if not (job_path(job_id) / "forecast.json").exists():
             messages = await opencode.messages(cast(str, session_id))
             write_json(job_path(job_id) / "messages.json", messages)
