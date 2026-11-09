@@ -11,6 +11,7 @@ from metac_bot.infrastructure import runner as main
 from metac_bot.forecasting.implementation import jobs
 from metac_bot.infrastructure.config import RunConfig
 from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
+from metac_bot.forecasting.strategy.roles import ROLES
 
 
 class RunnerTests(unittest.IsolatedAsyncioTestCase):
@@ -90,7 +91,7 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertNotIsInstance(result, Exception)
             publish.assert_awaited_once()
-            self.assertEqual(len(client.sessions), 14)
+            self.assertEqual(len(client.sessions), 2 * len(ROLES))
 
     async def test_environment_failure_returns_without_starting_opencode(self) -> None:
         with (

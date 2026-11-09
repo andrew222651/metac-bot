@@ -42,7 +42,7 @@ The command prints a template generated from the settings; the redirection creat
 bash scripts/python.sh -m metac_bot --mode test_questions --limit 1 --dry-run
 ```
 
-Remove `--dry-run` only if you want to publish to the testing area. Reports and session artifacts are saved in `forecast_runs/`. Forecasting can incur model and research costs; an ensemble forecast can require 16 or more model sessions. Shell execution requires permission and is **not sandboxed**.
+Remove `--dry-run` only if you want to publish to the testing area. Reports and session artifacts are saved in `forecast_runs/`. Forecasting can incur model and research costs; an ensemble forecast can require 12 or more model sessions. Shell execution requires permission and is **not sandboxed**.
 
 CLI options override matching environment variables. The private server normally uses your saved OpenCode provider accounts. An explicit `OPENROUTER_API_KEY` uses an isolated account database without changing your saved account; other saved provider accounts are unavailable to it and need environment keys if used. In that case, session history is temporary, but forecast artifacts remain in `forecast_runs/`. An explicit `OPENCODE_SEARCH_PROVIDER` applies only to the private server.
 

@@ -9,8 +9,8 @@ This package describes the bot's forecasting behavior; the neighboring
   perspectives and instructions. The agents and skills in `opencode/` contain
   the detailed forecasting, research, and modeling guidance.
 - The ensemble gathers independent posterior proposals, requires the configured
-  quorum and both modeling roles, and runs independent review rounds. It pools
-  current distributions with equal weights, without treating shared sources as
+  quorum without requiring any particular role, and runs independent review
+  rounds. It pools current distributions with equal weights, without treating shared sources as
   independent. It fails closed unless all reviewers accept and the consensus
   change is within the configured tolerance.
 - `pooling.py` handles all question types and coherent conditional joints;

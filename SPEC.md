@@ -21,7 +21,7 @@ the condition and the outcome distributions given each condition.
 
 ## Agents and research
 
-The ensemble begins with independent proposals from seven perspectives:
+The ensemble begins with independent proposals from six perspectives:
 
 - **Generalist:** assess the whole question and balance competing scenarios.
 - **Base-rate analyst:** find reference classes, historical frequencies, and a
@@ -29,7 +29,6 @@ The ensemble begins with independent proposals from seven perspectives:
 - **Current-evidence analyst:** investigate recent developments and authoritative
   sources.
 - **Skeptic:** challenge assumptions and seek credible counterevidence.
-- **Quantitative analyst:** examine measurable trends, likelihoods, and uncertainty.
 - **Economic modeler:** develop an explicit economic model when relevant.
 - **Causal modeler:** develop an explicit Bayesian causal model when relevant.
 
@@ -54,9 +53,7 @@ and for historical or reference-class information, seek contrary evidence, and
 report unavailable tools or missing information without inventing sources.
 
 All agents are informed that their Python environment includes NumPy,
-SciPy, SymPy, pandas, statsmodels, NetworkX, PyMC, and ArviZ. They are encouraged
-to use basic statistical modeling when useful and feasible, while explaining
-assumptions, uncertainty, limitations, and whether computations actually ran.
+SciPy, SymPy, pandas, statsmodels, NetworkX, PyMC, and ArviZ.
 
 
 ## Shared superforecasting guidance
@@ -70,7 +67,8 @@ Each agent session has a configurable time limit. Agents are told their budget a
 should prioritize recording a valid result before it expires, while reporting
 incomplete research and other limitations honestly. A recorded result can be
 used if the session subsequently times out; without one, that session fails.
-The ensemble still requires convergence.
+The ensemble requires a configured quorum of proposals and reviews and must
+converge.
 The session limit is not a deadline for the entire ensemble: queueing, multiple
 rounds, service calls, and interruption add time beyond an individual session.
 
@@ -130,6 +128,8 @@ agents' priors, posteriors, evidence, dependence assumptions, and models. Each
 reviewer flags errors and may revise the posterior for its assigned perspective
 with reasons; a critique is not itself a new evidence factor. Each round recomputes
 the pool from the agents' current posteriors and fixed weights.
+If a review does not complete, that perspective retains its previous posterior,
+provided the completed reviews meet the quorum.
 A round converges only when every completed reviewer accepts the forecast they
 reviewed and the new consensus changes by no more than the configured tolerance.
 Change is the absolute probability difference for binary questions, the largest

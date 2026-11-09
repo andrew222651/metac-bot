@@ -22,9 +22,14 @@ from metac_bot.forecasting.implementation.bayesian import (
     candidates_from_proposals,
     validate_stage,
 )
-from metac_bot.forecasting.implementation.bayesian_jobs import get_stage, record_stage
+from metac_bot.forecasting.implementation.bayesian_jobs import (
+    get_stage,
+    read_stage,
+    record_stage,
+)
 from metac_bot.forecasting.implementation.ensemble import EnsembleRunner, EnsembleSettings
 from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
+from metac_bot.forecasting.strategy.roles import ROLES
 from metac_bot.forecasting.strategy.workflow import run_ensemble
 
 
@@ -477,10 +482,11 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             with patch.object(client, "wait", side_effect=revise):
                 result = await run_ensemble(client, question, job_id, review_rounds=2)
             self.assertAlmostEqual(
-                result["prediction"]["probability"], (0.9 + 6 / 3) / 7
+                result["prediction"]["probability"],
+                (0.9 + (len(ROLES) - 1) / 3) / len(ROLES),
             )
-            self.assertEqual(seen_reviews.count((1, 0)), 7)
-            self.assertEqual(seen_reviews.count((2, 7)), 7)
+            self.assertEqual(seen_reviews.count((1, 0)), len(ROLES))
+            self.assertEqual(seen_reviews.count((2, len(ROLES))), len(ROLES))
             artifact = __import__("json").loads(
                 (jobs.job_path(job_id) / "ensemble.json").read_text()
             )
@@ -530,7 +536,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 jobs.save_forecast(job_id, **result)
                 report = jobs.read_report(job_id)
                 self.assertIs(type(report.question), type(question))
-                self.assertEqual(len(client.sessions), 14)
+                self.assertEqual(len(client.sessions), 2 * len(ROLES))
 
     async def test_multiple_choice_runs_complete_ensemble(self) -> None:
         with (
@@ -543,7 +549,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             job_id = jobs.create_job(question)
             client = FakeOpenCode()
             result = await run_ensemble(client, question, job_id, concurrency=2)
-            self.assertEqual(len(client.sessions), 14)
+            self.assertEqual(len(client.sessions), 2 * len(ROLES))
             expected = {"A": 0.4, "B": 0.3, "C": 0.2, "D": 0.1}
             for option in expected:
                 self.assertAlmostEqual(
@@ -583,7 +589,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertAlmostEqual(result["prediction"]["probability"], 1 / 3)
             self.assertLessEqual(client.max_active, 2)
-            self.assertEqual(len(client.sessions), 14)
+            self.assertEqual(len(client.sessions), 2 * len(ROLES))
             for session in client.sessions.values():
                 stage = session["title"].split()[1].rstrip(":")
                 self.assertEqual(
@@ -626,7 +632,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                     s for s in client.sessions.values() if s["title"].endswith(role)
                 ]
                 self.assertEqual([s["agent"] for s in sessions], [role, role])
-            for stage in artifact["stages"][:7]:
+            for stage in artifact["stages"][: len(ROLES)]:
                 context = get_stage(stage["stage_id"])["context"]
                 self.assertNotIn("proposals", context)
                 self.assertNotIn("prior", context)
@@ -644,7 +650,6 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                         {
                             "generalist",
                             "skeptic",
-                            "quantitative",
                             "economic-modeler",
                             "causal-modeler",
                         }
@@ -654,48 +659,60 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 )
             self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
 
-    async def test_required_modeler_failure_prevents_result_despite_quorum(
-        self,
-    ) -> None:
-        with (
-            TemporaryDirectory() as directory,
-            patch.object(jobs, "JOBS", Path(directory)),
-        ):
-            question = BinaryQuestion(question_text="Synthetic")
-            job_id = jobs.create_job(question)
-            with self.assertRaisesRegex(
-                RuntimeError, "Required modeling proposals failed: causal-modeler"
-            ) as exc:
-                await run_ensemble(FakeOpenCode({"causal-modeler"}), question, job_id)
-            self.assertIn("simulated failure", str(exc.exception))
-            self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
+    async def test_any_role_can_fail_proposal_with_quorum(self) -> None:
+        for role in ROLES:
+            with (
+                self.subTest(role=role),
+                TemporaryDirectory() as directory,
+                patch.object(jobs, "JOBS", Path(directory)),
+            ):
+                question = BinaryQuestion(question_text="Synthetic")
+                job_id = jobs.create_job(question)
+                result = await run_ensemble(FakeOpenCode({role}), question, job_id)
+                self.assertAlmostEqual(result["prediction"]["probability"], 1 / 3)
+                artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+                self.assertNotIn(role, artifact["weights"])
+                self.assertEqual(len(artifact["weights"]), len(ROLES) - 1)
+                self.assertTrue(artifact["converged"])
 
-    async def test_required_modeler_review_failure_prevents_result_despite_quorum(
-        self,
-    ) -> None:
-        with (
-            TemporaryDirectory() as directory,
-            patch.object(jobs, "JOBS", Path(directory)),
-        ):
-            question = BinaryQuestion(question_text="Synthetic")
-            job_id = jobs.create_job(question)
-            client = FakeOpenCode()
-            original_wait = client.wait
+    async def test_any_role_can_fail_review_with_quorum(self) -> None:
+        for role in ROLES:
+            with (
+                self.subTest(role=role),
+                TemporaryDirectory() as directory,
+                patch.object(jobs, "JOBS", Path(directory)),
+            ):
+                question = BinaryQuestion(question_text="Synthetic")
+                job_id = jobs.create_job(question)
+                client = FakeOpenCode()
+                original_wait = client.wait
 
-            async def fail_causal_review(session: str, timeout: float) -> None:
-                if (
-                    client.sessions[session]["title"]
-                    == "Bayesian review: causal-modeler"
-                ):
-                    raise RuntimeError("Review failure")
-                await original_wait(session, timeout)
+                async def fail_review(session: str, timeout: float) -> None:
+                    title = client.sessions[session]["title"]
+                    if title == f"Bayesian review: {role}":
+                        raise RuntimeError("Review failure")
+                    await original_wait(session, timeout)
+                    if title == f"Bayesian proposal: {role}":
+                        stage_id = client.sessions[session]["stage_id"]
+                        proposal_result = read_stage(stage_id)
+                        proposal_result["posterior"] = {"probability": 0.5}
+                        record_stage(stage_id, proposal_result)
 
-            with patch.object(client, "wait", side_effect=fail_causal_review):
-                with self.assertRaisesRegex(
-                    RuntimeError, "Required modeling reviews failed: causal-modeler"
-                ):
-                    await run_ensemble(client, question, job_id)
-            self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
+                with patch.object(client, "wait", side_effect=fail_review):
+                    result = await run_ensemble(client, question, job_id)
+                self.assertAlmostEqual(
+                    result["prediction"]["probability"],
+                    (0.5 + (len(ROLES) - 1) / 3) / len(ROLES),
+                )
+                artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+                self.assertEqual(
+                    artifact["rounds"][1]["posteriors"][role],
+                    artifact["rounds"][0]["posteriors"][role],
+                )
+                self.assertEqual(
+                    len(artifact["rounds"][1]["review_stages"]), len(ROLES) - 1
+                )
+                self.assertTrue(artifact["converged"])
 
     async def test_review_quorum_failure_prevents_result(self) -> None:
         with (

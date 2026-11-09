@@ -9,6 +9,7 @@ Apply these practical principles inspired by Tetlock's Superforecasting:
 - Seek diverse, independent evidence and competing explanations, including counterevidence.
 - Distinguish facts from assumptions; check source quality, dates, and possible dependence.
 - Express uncertainty quantitatively and avoid unwarranted precision or overconfidence.
+- Examine measurable trends and likelihoods where useful, regardless of your role.
 - Update beliefs when evidence changes, considering how expected that evidence was under each outcome.
 - Consider alternative scenarios and the time horizon; distinguish what is knowable from what is not.
 - Revise judgments openly, track reasons, and learn from calibration and past errors.

@@ -137,6 +137,9 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid tournament mode"):
             RunConfig(mode=cast(Any, "metaculus_cup"))
         with self.assertRaises(ValueError):
-            RunConfig(ensemble_min_members=8)
+            RunConfig(ensemble_min_members=7)
+        self.assertEqual(RunConfig(ensemble_min_members=6).ensemble_min_members, 6)
+        with self.assertRaises(ValueError):
+            RunConfig(ensemble_models={"quantitative": "provider/model"})
         with self.assertRaises(ValueError):
             RunConfig(ensemble_models={"unknown": "provider/model"})

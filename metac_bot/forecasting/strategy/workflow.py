@@ -8,7 +8,7 @@ from forecasting_tools import MetaculusQuestion
 
 from ..implementation.ensemble import EnsembleRunner, EnsembleSettings
 from .pooling import pool_distance, pool_posteriors, publication_prediction
-from .roles import MODEL_ROLES, ROLES
+from .roles import ROLES
 
 
 def uses_ensemble(question: MetaculusQuestion, *, single_agent: bool) -> bool:
@@ -33,14 +33,6 @@ def require_quorum(
         raise RuntimeError(
             f"Only {len(completed)} Bayesian {description}; need {runner.settings.min_members}. "
             f"{runner.describe_failures(stage, round_number=round_number)}"
-        )
-    required_roles = set(MODEL_ROLES) & set(ROLES)
-    missing = required_roles - {result["role"] for result in completed}
-    if missing:
-        noun = "proposals" if stage == "proposal" else "reviews"
-        raise RuntimeError(
-            f"Required modeling {noun} failed: {', '.join(sorted(missing))}. "
-            f"{runner.describe_failures(stage, missing, round_number)}"
         )
     return completed
 

@@ -56,7 +56,8 @@ class CommonOptions:
         int | None, Parameter(help="Maximum simultaneous ensemble sessions.")
     ] = None
     ensemble_min_members: Annotated[
-        int | None, Parameter(help="Minimum successful proposals and reviews (1–7).")
+        int | None,
+        Parameter(help=f"Minimum successful proposals and reviews (1–{len(ROLES)})."),
     ] = None
     ensemble_review_rounds: Annotated[
         int | None, Parameter(help="Maximum review rounds (1–5).")
