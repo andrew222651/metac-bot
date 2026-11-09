@@ -1,6 +1,6 @@
 ---
 name: Metaculus Forecast
-description: Research a Metaculus forecasting job and record a calibrated, structured probability forecast with the Metaculus MCP tools.
+description: Research a Metaculus forecasting job and record an accurate, structured probability forecast with the Metaculus MCP tools.
 ---
 
 # Forecast a question

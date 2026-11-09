@@ -3,12 +3,34 @@
 import unittest
 
 from forecasting_tools import BinaryQuestion, MultipleChoiceQuestion, NumericQuestion
+from scipy.stats import norm
 
 from metac_bot.forecasting.strategy.aggregation import posterior_change
+from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
 from metac_bot.forecasting.strategy.workflow import uses_ensemble
 
 
 class StrategyTests(unittest.TestCase):
+    def test_forecasting_guidance_prioritizes_accuracy(self) -> None:
+        self.assertIn("accurate probability distribution", SUPERFORECASTING_PRINCIPLES)
+        self.assertIn("calibration alone is not the objective", SUPERFORECASTING_PRINCIPLES)
+
+    def test_agents_are_encouraged_to_use_available_scipy(self) -> None:
+        self.assertIn("basic statistical modeling", SUPERFORECASTING_PRINCIPLES)
+        self.assertIn("SciPy", SUPERFORECASTING_PRINCIPLES)
+        self.assertAlmostEqual(norm.cdf(0), 0.5)
+
+    def test_agents_are_informed_of_modeling_libraries(self) -> None:
+        for library in (
+            "NumPy", "SciPy", "SymPy", "pandas", "statsmodels", "NetworkX", "PyMC", "ArviZ"
+        ):
+            with self.subTest(library=library):
+                self.assertIn(library, SUPERFORECASTING_PRINCIPLES)
+
+    def test_agents_can_discuss_auxiliary_probabilities(self) -> None:
+        self.assertIn("auxiliary probabilities for related events", SUPERFORECASTING_PRINCIPLES)
+        self.assertIn("rather than as additional target forecasts", SUPERFORECASTING_PRINCIPLES)
+
     def test_ensemble_selection(self) -> None:
         binary = BinaryQuestion(question_text="Will it happen?")
         choice = MultipleChoiceQuestion(question_text="Which?", options=["A", "B"])

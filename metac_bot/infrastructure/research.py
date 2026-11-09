@@ -12,7 +12,7 @@ from .runtime import is_real_env
 
 
 def available_providers() -> dict[str, bool]:
-    """Report configured credentials without exposing their values."""
+    """Report provider configuration without checking service availability."""
     return {
         "asknews": is_real_env("ASKNEWS_API_KEY")
         or (is_real_env("ASKNEWS_CLIENT_ID") and is_real_env("ASKNEWS_SECRET")),

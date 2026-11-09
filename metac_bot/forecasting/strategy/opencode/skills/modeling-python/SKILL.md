@@ -38,7 +38,8 @@ override the default.
 
 Record the equations, complete reproducible code, data sources or synthetic
 assumptions, dependency versions if relevant, results and uncertainty in your
-model artifact. State whether the code actually ran, report errors honestly, and
+research or rationale, or in your model artifact if provided. State whether the
+code actually ran, report errors honestly, and
 never imply execution or fitting if it did not occur. If shell access, packages,
 data, or runtime resources are unavailable, explain the limitation instead of
 inventing a numerical result. A statistically valid model still needs defensible

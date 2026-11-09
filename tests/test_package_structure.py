@@ -27,6 +27,10 @@ class PackageStructureTests(unittest.TestCase):
             "do not redo the initial research",
             stage_prompt("review", "skeptic", "stage", one_off=False),
         )
+        self.assertIn(
+            "reviewer for the skeptic proposal",
+            stage_prompt("review", "skeptic", "stage", one_off=False),
+        )
         self.assertNotIn(
             "standalone",
             stage_prompt("decision", "adjudicator", "stage", one_off=False),

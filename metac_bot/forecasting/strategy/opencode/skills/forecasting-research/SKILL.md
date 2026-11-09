@@ -10,8 +10,10 @@ description: Research forecasting questions using native web tools, AskNews, Per
    complementary searches when research is needed: current developments and a
    historical/reference-class view.
 2. Call `research.available_providers` to see which optional services have
-   credentials. This checks configuration, not account validity. Native OpenCode
-   web search and web fetch remain available independently.
+   credentials. This checks configuration, not account validity or service
+   availability. Native OpenCode web search and web fetch do not depend on these
+   optional research-service credentials, but also depend on their configuration
+   and availability.
 3. Choose tools by the evidence needed; do not call every provider by default:
    - Native web search/fetch: general research and primary-source verification.
    - `research.exa_search`: relevant source text, optionally restricted to primary

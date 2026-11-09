@@ -27,7 +27,8 @@ def stage_prompt(stage: Stage, label: str, stage_id: str, *, one_off: bool) -> s
         instructions = ROLES.get(label, "")
     elif stage == "review":
         instructions = (
-            f"Review the supplied work from the {label} perspective; "
+            f"Review the supplied work as the reviewer for the {label} proposal; "
+            f"revise the posterior for the {label} perspective when appropriate; "
             "do not redo the initial research or rebuild the model."
         )
     else:
