@@ -124,13 +124,15 @@ class EnvironmentSettings(ConnectionSettings):
         None, description="Override the review session deadline, in seconds."
     )
     METAC_BOT_ENSEMBLE_DECISION_TIMEOUT: float | None = Field(
-        None, description="Override the adjudicator session deadline, in seconds."
+        None,
+        description="Legacy decision timeout; unused by the distributional ensemble.",
     )
     METAC_BOT_ENSEMBLE_MODELS: str | None = Field(
         None, description="JSON object mapping ensemble roles to provider/model IDs."
     )
     METAC_BOT_ENSEMBLE_ADJUDICATOR_MODEL: str | None = Field(
-        None, description="Provider/model override for adjudication sessions."
+        None,
+        description="Legacy adjudicator model; unused by the distributional ensemble.",
     )
 
     METACULUS_TOKEN: SecretStr | None = Field(

@@ -7,7 +7,14 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from forecasting_tools import BinaryQuestion, MultipleChoiceQuestion
+from forecasting_tools import (
+    BinaryQuestion,
+    ConditionalQuestion,
+    DateQuestion,
+    DiscreteQuestion,
+    MultipleChoiceQuestion,
+    NumericQuestion,
+)
 from metac_bot.forecasting.implementation import jobs
 from metac_bot.forecasting.implementation.bayesian import (
     calculate_choice_posterior,
@@ -275,7 +282,61 @@ class FakeOpenCode:
             stage = get_stage(stage_id)
             options = stage["question"].get("options")
             if stage["stage"] == "proposal":
-                result = choice_proposal(options) if options else proposal()
+
+                def forecast(question: dict) -> dict:
+                    if question["question_type"] == "conditional":
+                        return {
+                            "parent": forecast(question["parent"]),
+                            "prediction_yes": forecast(question["question_yes"]),
+                            "prediction_no": forecast(question["question_no"]),
+                        }
+                    if question["question_type"] in ("numeric", "discrete"):
+                        return {
+                            "percentiles": [
+                                {"percentile": 0.1, "value": 10},
+                                {"percentile": 0.9, "value": 90},
+                            ]
+                        }
+                    if question["question_type"] == "date":
+                        return {
+                            "percentiles": [
+                                {"percentile": 0.1, "value": "2027-02-01T00:00:00Z"},
+                                {"percentile": 0.9, "value": "2027-11-01T00:00:00Z"},
+                            ]
+                        }
+                    if question["question_type"] == "multiple_choice":
+                        names = question["options"]
+                        return {
+                            "options": {
+                                name: (len(names) - i) / sum(range(1, len(names) + 1))
+                                for i, name in enumerate(names)
+                            }
+                        }
+                    return {"probability": 1 / 3}
+
+                posterior = forecast(stage["question"])
+                prior = (
+                    {"options": {option: 1 / len(options) for option in options}}
+                    if options
+                    else posterior
+                )
+                result = {
+                    "prior": prior,
+                    "posterior": posterior,
+                    "prior_rationale": "Historical baseline",
+                    "reasoning": "Bayesian update",
+                    "research": "Synthetic research",
+                    "limitations": "Uncertain",
+                    "evidence": [
+                        {
+                            "claim": "Observation",
+                            "source_urls": ["https://example.org/a"],
+                            "source_date": "2026-01-01",
+                            "reasoning": "Joint evidence",
+                            "limitations": "Uncertain",
+                        }
+                    ],
+                }
                 if stage["context"]["role"] == "economic-modeler":
                     result["model"] = model_artifact("economic")
                 elif stage["context"]["role"] == "causal-modeler":
@@ -283,8 +344,9 @@ class FakeOpenCode:
             elif stage["stage"] == "review":
                 result = {
                     "accepts_current": True,
+                    "posterior": stage["context"]["posteriors"][title.split(": ")[-1]],
                     "critique": "Check assumptions",
-                    "proposed_changes": "Keep",
+                    "reasoning": "Keep",
                     "limitations": "Uncertain",
                 }
             else:
@@ -296,6 +358,98 @@ class FakeOpenCode:
 
 
 class EnsembleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_revisions_are_pooled_and_prior_reviews_are_shared(self) -> None:
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+        ):
+            question = BinaryQuestion(question_text="Synthetic")
+            job_id = jobs.create_job(question)
+            client = FakeOpenCode()
+            original_wait = client.wait
+            seen_reviews = []
+
+            async def revise(session: str, timeout: float) -> None:
+                if "review:" not in client.sessions[session]["title"]:
+                    return await original_wait(session, timeout)
+                stage_id = client.sessions[session]["stage_id"]
+                context = get_stage(stage_id)["context"]
+                role = client.sessions[session]["title"].split(": ")[-1]
+                seen_reviews.append(
+                    (context["round"], len(context["previous_reviews"]))
+                )
+                posterior = context["posteriors"][role]
+                if context["round"] == 1 and role == "generalist":
+                    posterior = {"probability": 0.9}
+                record_stage(
+                    stage_id,
+                    {
+                        "accepts_current": context["round"] > 1,
+                        "posterior": posterior,
+                        "critique": "Consider the evidence",
+                        "reasoning": "Updated after review",
+                        "limitations": "Uncertain",
+                    },
+                )
+
+            with patch.object(client, "wait", side_effect=revise):
+                result = await run_ensemble(client, question, job_id, review_rounds=2)
+            self.assertAlmostEqual(
+                result["prediction"]["probability"], (0.9 + 6 / 3) / 7
+            )
+            self.assertEqual(seen_reviews.count((1, 0)), 7)
+            self.assertEqual(seen_reviews.count((2, 7)), 7)
+            artifact = __import__("json").loads(
+                (jobs.job_path(job_id) / "ensemble.json").read_text()
+            )
+            self.assertEqual(len(artifact["rounds"]), 3)
+            self.assertTrue(artifact["converged"])
+
+    async def test_numeric_date_and_conditional_ensembles_save_reports(self) -> None:
+        numeric = NumericQuestion(
+            question_text="How many?",
+            lower_bound=0,
+            upper_bound=100,
+            open_lower_bound=True,
+            open_upper_bound=True,
+        )
+        discrete = DiscreteQuestion(
+            question_text="How many discrete outcomes?",
+            lower_bound=0,
+            upper_bound=100,
+            open_lower_bound=False,
+            open_upper_bound=False,
+            cdf_size=11,
+        )
+        date = DateQuestion(
+            question_text="When?",
+            lower_bound="2027-01-01T00:00:00Z",
+            upper_bound="2028-01-01T00:00:00Z",
+            open_lower_bound=False,
+            open_upper_bound=False,
+        )
+        parent = BinaryQuestion(question_text="Condition?")
+        conditional = ConditionalQuestion(
+            question_text="Conditional?",
+            parent=parent,
+            child=numeric,
+            question_yes=numeric,
+            question_no=numeric,
+        )
+        for question in (numeric, discrete, date, conditional):
+            with (
+                self.subTest(question=type(question).__name__),
+                TemporaryDirectory() as directory,
+                patch.object(jobs, "JOBS", Path(directory)),
+            ):
+                job_id = jobs.create_job(question)
+                client = FakeOpenCode()
+                result = await run_ensemble(client, question, job_id)
+                jobs.save_forecast(job_id, **result)
+                report = jobs.read_report(job_id)
+                self.assertIs(type(report.question), type(question))
+                self.assertEqual(len(client.sessions), 14)
+
     async def test_multiple_choice_runs_complete_ensemble(self) -> None:
         with (
             TemporaryDirectory() as directory,
@@ -307,7 +461,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             job_id = jobs.create_job(question)
             client = FakeOpenCode()
             result = await run_ensemble(client, question, job_id, concurrency=2)
-            self.assertEqual(len(client.sessions), 16)
+            self.assertEqual(len(client.sessions), 14)
             expected = {"A": 0.4, "B": 0.3, "C": 0.2, "D": 0.1}
             for option in expected:
                 self.assertAlmostEqual(
@@ -320,7 +474,9 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(artifact["rounds"][1]["posterior_change"], 0)
             stage = get_stage(artifact["stages"][0]["stage_id"])
             self.assertEqual(
-                stage["result_schema"]["properties"]["prior"]["required"],
+                stage["result_schema"]["properties"]["prior"]["properties"]["options"][
+                    "required"
+                ],
                 question.options,
             )
 
@@ -345,7 +501,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertAlmostEqual(result["prediction"]["probability"], 1 / 3)
             self.assertLessEqual(client.max_active, 2)
-            self.assertEqual(len(client.sessions), 16)
+            self.assertEqual(len(client.sessions), 14)
             for session in client.sessions.values():
                 stage = session["title"].split()[1].rstrip(":")
                 self.assertEqual(
@@ -361,12 +517,8 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 [s["model"] for s in skeptic], ["provider/skeptic", "provider/skeptic"]
             )
-            self.assertTrue(
-                all(
-                    s["model"] == "provider/judge"
-                    for s in client.sessions.values()
-                    if "decision:" in s["title"]
-                )
+            self.assertFalse(
+                any("decision:" in s["title"] for s in client.sessions.values())
             )
             artifact = __import__("json").loads(
                 (jobs.job_path(job_id) / "ensemble.json").read_text()
@@ -501,8 +653,9 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                     stage_id,
                     {
                         "accepts_current": False,
+                        "posterior": {"probability": 1 / 3},
                         "critique": "Disagree",
-                        "proposed_changes": "Revise prior",
+                        "reasoning": "Revise prior",
                         "limitations": "Uncertain",
                     },
                 )

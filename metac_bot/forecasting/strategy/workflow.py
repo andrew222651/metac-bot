@@ -1,23 +1,18 @@
-"""The forecasting strategy: independent proposals, adjudication, and review."""
+"""The forecasting strategy: independent posteriors, pooling, and review."""
 
 import asyncio
-from typing import Any, Literal, TypeGuard
+from typing import Any, Literal
+import json
 
-from forecasting_tools import BinaryQuestion, MetaculusQuestion, MultipleChoiceQuestion
+from forecasting_tools import MetaculusQuestion
 
-from ..implementation.bayesian import candidates_from_proposals
 from ..implementation.ensemble import EnsembleRunner, EnsembleSettings
-from .aggregation import make_result, posterior_change
+from .pooling import pool_distance, pool_posteriors, publication_prediction
 from .roles import MODEL_ROLES, ROLES
 
 
-def uses_ensemble(
-    question: MetaculusQuestion, *, single_agent: bool
-) -> TypeGuard[BinaryQuestion | MultipleChoiceQuestion]:
-    return (
-        isinstance(question, (BinaryQuestion, MultipleChoiceQuestion))
-        and not single_agent
-    )
+def uses_ensemble(question: MetaculusQuestion, *, single_agent: bool) -> bool:
+    return not single_agent
 
 
 def require_quorum(
@@ -51,7 +46,7 @@ def require_quorum(
 
 
 async def run_workflow(runner: EnsembleRunner) -> dict:
-    """Run independent proposals and review rounds; never publish from here."""
+    """Pool independent Bayesian judgments, then review and revise them."""
     proposals = require_quorum(
         runner,
         await asyncio.gather(
@@ -64,24 +59,25 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
         ),
         "proposal",
     )
-    candidates = candidates_from_proposals(proposals, runner.options)
-    initial, current = await runner.decide(
-        "initial-adjudicator",
-        {"proposals": proposals, "candidates": candidates, "round": 0},
-        candidates,
-    )
+    weights = [1 / len(proposals)] * len(proposals)
+    posteriors = {item["role"]: item["result"]["posterior"] for item in proposals}
+    current = pool_posteriors(runner.question, list(posteriors.values()), weights)
+    runner.artifacts["weights"] = dict(zip(posteriors, weights))
     runner.artifacts["rounds"].append(
-        {"round": 0, "decision_stage": initial["stage_id"], **current}
+        {"round": 0, "posteriors": dict(posteriors), "consensus": current.prediction()}
     )
     runner.persist()
 
     converged = False
+    previous_reviews: list[dict] = []
     for round_number in range(1, runner.settings.review_rounds + 1):
         context = {
             "round": round_number,
             "proposals": proposals,
-            "candidates": candidates,
-            "current": current,
+            "posteriors": dict(posteriors),
+            "weights": dict(zip(posteriors, weights)),
+            "current": current.prediction(),
+            "previous_reviews": previous_reviews,
         }
         reviews = require_quorum(
             runner,
@@ -94,33 +90,35 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
             "review",
             round_number,
         )
-        final, updated = await runner.decide(
-            f"adjudicator-round-{round_number}",
-            {**context, "reviews": reviews},
-            candidates,
+        for review in reviews:
+            posteriors[review["role"]] = review["result"]["posterior"]
+        previous_reviews = reviews
+        updated = pool_posteriors(runner.question, list(posteriors.values()), weights)
+        delta = pool_distance(
+            current, updated, error=min(0.001, runner.settings.tolerance / 10)
         )
-        delta = posterior_change(current, updated, runner.options)
         current = updated
         accepted = all(review["result"]["accepts_current"] for review in reviews)
         converged = accepted and delta <= runner.settings.tolerance
         runner.artifacts["rounds"].append(
             {
                 "round": round_number,
-                "decision_stage": final["stage_id"],
                 "review_stages": [item["stage_id"] for item in reviews],
                 "all_reviewers_accept_previous": accepted,
                 "posterior_change": delta,
-                **current,
+                "posteriors": dict(posteriors),
+                "consensus": current.prediction(),
             }
         )
         runner.persist()
         if converged:
             break
 
-    prediction = runner.prediction(current)
+    posterior = current.prediction()
+    prediction = publication_prediction(current)
     runner.artifacts.update(
         converged=converged,
-        posterior=current["posterior"],
+        posterior=posterior,
         published_prediction=prediction,
     )
     runner.persist()
@@ -128,12 +126,26 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
         raise RuntimeError(
             f"Bayesian ensemble did not converge within {runner.settings.review_rounds} review rounds; no forecast published"
         )
-    return make_result(proposals, candidates, current, prediction, converged)
+    research = "\n\n".join(
+        f"### {item['role']}\n{item['result']['research']}" for item in proposals
+    )
+    rationale = (
+        "Equal-weight linear pooling of agents' Bayesian judgments; shared evidence "
+        "is not treated as independent, and the pool is not a verified Bayesian posterior. "
+        "Quantiles use piecewise-linear CDF interpolation and the documented tail assumptions. "
+        "All completed reviewers accepted the consensus and the change met the tolerance.\n\n"
+        "## Agent proposals, priors, sources, and models\n\n```json\n"
+        + json.dumps(proposals, indent=2)
+        + "\n```\n\n## Ensemble deliberation and revisions\n\n```json\n"
+        + json.dumps(runner.artifacts, indent=2)
+        + "\n```"
+    )
+    return {"prediction": prediction, "research": research, "rationale": rationale}
 
 
 async def run_ensemble(
     opencode: Any,
-    question: BinaryQuestion | MultipleChoiceQuestion,
+    question: MetaculusQuestion,
     job_id: str,
     *,
     model: str | None = None,

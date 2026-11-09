@@ -1,76 +1,50 @@
 ---
 name: Bayesian Forecast Ensemble
-description: Independently propose evidence, review, or adjudicate a binary or multiple-choice forecast using an auditable shared Bayesian evidence ledger.
+description: Independently forecast and review distributions in a deliberating Bayesian ensemble.
 ---
 
 # Bayesian ensemble stage
 
-Call `metaculus.get_bayesian_stage` with your assigned stage ID. Complete the
-specified stage and call `metaculus.record_bayesian_stage` with a `result` object
-matching the returned JSON schema. Correct validation errors and retry. The
-runner computes the posterior; do not publish or write files.
+Call `metaculus.get_bayesian_stage` for your assigned stage ID, follow the JSON
+schema, and submit with `metaculus.record_bayesian_stage`. Correct validation
+errors and retry. The runner aggregates and publishes; do not publish or edit files.
 
 ## Proposal
 
-Work independently from the assigned role. Load `forecasting-research` and
-research the question; read primary sources where possible. For binary questions,
-offer a prior in (0,1) and evidence with a likelihood ratio
-`P(evidence | YES) / P(evidence | NO)`. Greater than 1 favors YES; below 1
-favors NO. For multiple-choice questions, give a prior distribution with a
-positive probability for every exact option, summing to 1. For each evidence
-item provide `likelihoods`: positive relative weights for every exact option,
-proportional to `P(evidence | that option)`. The weights need not sum to 1;
-their ratios are what matter. Explain the reference class, prior assumptions,
-sources, dates, and limitations. These are uncertain elicited judgments, not measurements. Do not
-count a belief, prior, forecast, or absence of information as observed evidence.
-Include zero evidence items if no verifiable evidence is found; explicitly state
-the research limitation. Never invent sources, outcomes or numerical precision.
-Limit each claim to a coherent observation, with relevant citations.
+Work independently from your assigned role. Load `forecasting-research`, research
+the question, and read primary sources when possible. Specify a prior distribution,
+its rationale, your posterior distribution, and how the evidence changed your
+beliefs. Record source URLs, dates, observations, reasoning, and limitations;
+never invent sources or present a model output as independent evidence from its
+inputs. Identify shared or dependent evidence instead of counting it twice.
+
+For numeric and date forecasts, provide strictly increasing interior quantiles.
+The runner interprets their CDF as linear between quantiles, linear to a closed
+bound, and exponentially decaying beyond the first or last quantile for an open
+tail, with scale equal to the adjacent quantile interval. These are modeling
+assumptions: choose quantiles with these implications in mind and discuss tail
+uncertainty. For conditional questions, give a probability for the condition
+and outcome distributions assuming yes and no separately; do not supply an
+independent unconditional child forecast.
+
+For discrete numeric questions, the quantiles specify a latent continuous CDF;
+the platform converts it into its discrete outcome buckets. Consider the
+resulting bucket probabilities and disclose this approximation.
 
 If your role is `economic-modeler` or `causal-modeler`, load the corresponding
-modeling skill named in your role instructions and fill the `model` object in your
-proposal. Explicitly mark the model inapplicable if the question cannot support
-one; explain why and use "not applicable" for fields that do not apply. Separate
-models and their assumptions from observed evidence. Do not submit a model's
-prediction as an independent evidence item on top of its underlying observations.
-
-## Decision
-
-You receive all proposals and candidate IDs. Select an explicit common prior,
-explaining the reference class and considering the independently proposed priors.
-Assign each candidate exactly once to an evidence group or exclude it with a
-reason. Group overlapping, duplicate, and dependent observations, including
-different articles derived from the same study, announcement, or data. The
-same URL cannot occur in different groups. Do not treat repeated reports as
-independent evidence. For each ordered group, estimate its JOINT likelihood
-conditional on all earlier groups, with a substantive explanation of the assumed
-dependencies and how the estimate was obtained. For binary questions, give a
-single conditional likelihood ratio. For multiple choice, provide
-`conditional_likelihoods` with a positive relative weight for every exact
-option, proportional to the evidence likelihood conditional on earlier groups.
-Give a complete prior distribution and use the question's exact option names.
-Do not submit separate YES/NO binary forecasts for mutually exclusive options.
-Never multiply candidate
-likelihood ratios blindly. If dependence is unknown, say so and make a
-conservative judgment or exclude the candidate. Source overlap checks are only
-partial; semantically duplicated URLs must also be grouped. Describe uncertainty,
-model risk, and potential missing evidence in `limitations`.
-
-If reviews are present, consider each critique and use it to revise the prior,
-groups or likelihoods as appropriate. Keep the final ledger complete: all
-candidate IDs still appear exactly once. The runner recalculates from the final
-prior, not from the previous posterior; do not treat previous posterior as a new
-prior. Do not invent evidence or new candidate IDs.
+modeling skill and fill in your model artifact. Mark a model inapplicable with
+reasons when appropriate, using "not applicable" for irrelevant fields.
 
 ## Review
 
-Examine the supplied common prior, candidate evidence, ordered groups, likelihoods,
-dependence assumptions, posterior, and original proposals. Identify double
-counting, mistaken question interpretation, prior miscalibration, and implausible
-likelihoods. Give actionable proposed changes and express uncertainty. The review
-is a critique, not a new likelihood factor. If no issues are found, say so.
-Set `accepts_current` true only if you accept the current prior, evidence ledger,
-dependence assumptions, and posterior as a reasonable forecast despite remaining
-uncertainties. Otherwise set it false and describe what must change. Reviewers do
-not have access to one another's critiques until the adjudicator collects them.
-A stable posterior does not prove the assumptions are correct.
+You receive the current pooled forecast, the other proposals and the agents'
+current posteriors. Independently assess the resolution criteria, priors,
+sources, duplicated information, models, assumptions, and disagreements.
+Express remaining uncertainty and a substantive critique. Record your own updated
+posterior, or repeat your previous posterior if it remains appropriate. Do not
+update again just because a previously considered source is repeated. Set
+`accepts_current` true only when the consensus you reviewed is reasonable, not
+merely to force agreement. The consensus is a linear pool of judgments, not a
+verified posterior based on independent evidence; its displayed numeric/date
+quantiles approximate its full distribution. Reviewers do not see one another's
+current-round critiques. Stability and agreement do not guarantee accuracy.

@@ -4,14 +4,12 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
-from forecasting_tools import BinaryQuestion, MultipleChoiceQuestion
+from forecasting_tools import MetaculusQuestion
 
-from ..strategy.aggregation import aggregate
 from ..strategy.prompts import Stage, stage_prompt
 from ..strategy.roles import MODEL_ROLES
 from .agent import run_agent
 from .bayesian_jobs import create_stage, read_stage
-from .domain import build_prediction
 from .jobs import job_path, write_json
 
 
@@ -47,16 +45,13 @@ class EnsembleRunner:
     def __init__(
         self,
         opencode: Any,
-        question: BinaryQuestion | MultipleChoiceQuestion,
+        question: MetaculusQuestion,
         job_id: str,
         settings: EnsembleSettings,
     ) -> None:
         self.opencode = opencode
         self.question = question
         self.settings = settings
-        self.options = (
-            question.options if isinstance(question, MultipleChoiceQuestion) else None
-        )
         self.path = job_path(job_id)
         self.semaphore = asyncio.Semaphore(settings.concurrency)
         self.artifacts: dict[str, Any] = {
@@ -97,7 +92,9 @@ class EnsembleRunner:
         )
 
     async def run_stage(self, stage: Stage, label: str, context: dict) -> dict | None:
-        stage_id = create_stage(self.question, stage, context)
+        stage_id = create_stage(
+            self.question, stage, {**context, "method": "distributional"}
+        )
         entry = {
             "stage_id": stage_id,
             "stage": stage,
@@ -137,7 +134,7 @@ class EnsembleRunner:
                     prompt=self._prompt(stage, label, stage_id),
                 )
                 result = read_stage(stage_id)
-                entry["status"] = "complete"
+                entry.update(status="complete", result=result)
                 self.persist()
                 return {
                     "role": label,
@@ -149,26 +146,3 @@ class EnsembleRunner:
             entry.update(status="failed", error=f"{type(exc).__name__}: {exc}")
             self.persist()
             return None
-
-    async def decide(
-        self, label: str, context: dict, candidates: list[dict]
-    ) -> tuple[dict, dict]:
-        stage = await self.run_stage("decision", label, context)
-        if stage is None:
-            if context["round"] == 0:
-                message = "Bayesian initial adjudication failed"
-            else:
-                message = f"Bayesian adjudication failed in round {context['round']}"
-            raise RuntimeError(
-                f"{message}: {self.describe_failures('decision', {label}, context['round'])}"
-            )
-        return stage, aggregate(stage["result"], candidates, self.options)
-
-    def prediction(self, current: dict) -> dict:
-        if self.options is None:
-            return {"probability": current["published_probability"]}
-        return {
-            "options": build_prediction(
-                self.question, {"options": current["posterior"]}
-            ).to_dict()
-        }

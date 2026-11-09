@@ -19,11 +19,10 @@ class StrategyTests(unittest.TestCase):
             open_lower_bound=False,
             open_upper_bound=False,
         )
-        for question in (binary, choice):
+        for question in (binary, choice, numeric):
             with self.subTest(question=type(question).__name__):
                 self.assertTrue(uses_ensemble(question, single_agent=False))
                 self.assertFalse(uses_ensemble(question, single_agent=True))
-        self.assertFalse(uses_ensemble(numeric, single_agent=False))
 
     def test_convergence_uses_largest_choice_change(self) -> None:
         previous = {"posterior": {"A": 0.5, "B": 0.3, "C": 0.2}}

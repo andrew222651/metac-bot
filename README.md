@@ -28,7 +28,7 @@ bash scripts/python.sh -m metac_bot forecast \
   --model 'openrouter/openai/gpt-6.1-terra#low'
 ```
 
-Omit `--option` for a binary yes/no question. Add `--criteria` or `--background` when needed. Binary and multiple-choice questions use the full ensemble by default; `--single-agent` is an explicit cheaper alternative.
+Omit `--option` for a binary yes/no question. Add `--criteria` or `--background` when needed. All supported question types use the full ensemble by default; `--single-agent` is an explicit cheaper alternative.
 
 To test against one question from the Metaculus testing area **without publishing**, generate a configuration file if you do not already have one:
 

@@ -4,6 +4,7 @@ from forecasting_tools import MetaculusQuestion, MultipleChoiceQuestion
 
 from . import jobs
 from .bayesian import CHOICE_SCHEMAS, SCHEMAS, validate_stage
+from .deliberation import stage_schema, validate_result
 
 
 def stage_options(stage_id: str) -> list[str] | None:
@@ -28,6 +29,14 @@ def create_stage(question: MetaculusQuestion, stage: str, context: dict) -> str:
 
 def get_stage(stage_id: str) -> dict:
     data, options = _stage_state(stage_id)
+    if data["context"].get("method") == "distributional":
+        return {
+            "stage_id": stage_id,
+            "stage": data["stage"],
+            "context": data["context"],
+            "question": jobs.get_job(stage_id)["question"],
+            "result_schema": stage_schema(jobs.read_question(stage_id), data["stage"]),
+        }
     schemas = CHOICE_SCHEMAS if options is not None else SCHEMAS
     schema = schemas[data["stage"]].model_json_schema()
     if options is not None and data["stage"] in ("proposal", "decision"):
@@ -64,7 +73,12 @@ def get_stage(stage_id: str) -> dict:
 def record_stage(stage_id: str, result: dict) -> dict:
     path = jobs.job_path(stage_id)
     stage, options = _stage_state(stage_id)
-    validated = validate_stage(stage["stage"], result, stage["context"], options)
+    if stage["context"].get("method") == "distributional":
+        validated = validate_result(
+            jobs.read_question(stage_id), stage["stage"], result, stage["context"]
+        )
+    else:
+        validated = validate_stage(stage["stage"], result, stage["context"], options)
     jobs.write_json(path / "stage_result.json", validated)
     return {"saved": True, "stage_id": stage_id}
 
@@ -73,4 +87,8 @@ def read_stage(stage_id: str) -> dict:
     path = jobs.job_path(stage_id)
     stage, options = _stage_state(stage_id)
     result = jobs.read_json(path / "stage_result.json")
+    if stage["context"].get("method") == "distributional":
+        return validate_result(
+            jobs.read_question(stage_id), stage["stage"], result, stage["context"]
+        )
     return validate_stage(stage["stage"], result, stage["context"], options)

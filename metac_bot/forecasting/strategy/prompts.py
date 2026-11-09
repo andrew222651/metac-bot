@@ -43,6 +43,6 @@ def stage_prompt(stage: Stage, label: str, stage_id: str, *, one_off: bool) -> s
         f"{instructions} "
         "Use metaculus.get_bayesian_stage and metaculus.record_bayesian_stage. "
         "Follow the provided JSON schema, correct validation errors, and record your result. "
-        "The Python runner computes and stores the forecast; do not publish or edit files. "
+        "The Python runner pools the agents' distributions and stores the forecast; do not publish or edit files. "
         f"{standalone}"
     )

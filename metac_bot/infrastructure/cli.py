@@ -50,7 +50,7 @@ class CommonOptions:
     ] = None
     single_agent: Annotated[
         bool | None,
-        Parameter(help="Use a single agent for binary and multiple-choice questions."),
+        Parameter(help="Use a single agent instead of the default ensemble."),
     ] = None
     ensemble_concurrency: Annotated[
         int | None, Parameter(help="Maximum simultaneous ensemble sessions.")
@@ -73,13 +73,14 @@ class CommonOptions:
     ] = None
     ensemble_decision_timeout: Annotated[
         float | None,
-        Parameter(help="Adjudication session deadline; defaults to --timeout."),
+        Parameter(help="Legacy option; unused by the distributional ensemble."),
     ] = None
     ensemble_model: Annotated[
         list[str] | None, Parameter(help="ROLE=PROVIDER/MODEL; repeat for other roles.")
     ] = None
     ensemble_adjudicator_model: Annotated[
-        str | None, Parameter(help="Model for initial and review adjudication.")
+        str | None,
+        Parameter(help="Legacy option; unused by the distributional ensemble."),
     ] = None
 
     def run_config(

@@ -10,14 +10,13 @@ The goal is a calibrated probability distribution for a precisely defined future
 outcome, accompanied by an auditable explanation. A coding agent conducts
 research, reasons about evidence, and, when useful and feasible, runs
 computations or builds explicit models. Different agent roles provide distinct
-perspectives; their proposals are combined through an evidence-based Bayesian
-procedure rather than by averaging their forecasts.
+perspectives. Each agent forms a reasoned Bayesian forecast; the ensemble pools
+those forecasts and lets the agents review and revise their judgments.
 
-Binary and mutually exclusive multiple-choice questions normally use the
-ensemble below. Other question types, and explicitly requested single-agent
-forecasts, use a single forecasting agent. For numerical and date questions this
-agent expresses uncertainty as a distribution; conditional questions require
-forecasts conditional on the specified outcomes.
+All supported question types use the ensemble below by default. A single agent
+or another configuration may be selected explicitly. Numerical and date
+forecasts express uncertainty as distributions; conditional forecasts include
+the condition and the outcome distributions given each condition.
 
 ## Agents and research
 
@@ -61,56 +60,61 @@ is under competing outcomes, and remain open to criticism and revision. They
 should learn from calibration and past errors rather than defer blindly to other
 agents.
 
-## Ensemble and Bayesian aggregation
+## Ensemble aggregation and review
 
-Each proposing agent supplies a reasoned prior and sourced observations, with
-judgments about their likelihood under the possible outcomes. An observation is
-not a prior, a prediction, or merely an absence of information. The adjudicating
-agent selects a common prior, considers the proposals, and assigns every
-candidate observation either to an evidence group or to an exclusion with a
-reason. Related reports and overlapping sources belong together; repeated
-coverage of the same event must not be counted as independent evidence.
+Each proposing agent supplies its prior and posterior distributions, reasons for
+the update, sourced observations, research, assumptions, and limitations. An
+observation is not a prior, prediction, model output, or merely an absence of
+information. Agents identify overlapping sources and dependence and do not
+update again merely because another agent repeats information already considered.
 
-For ordered evidence groups $E_1,\ldots,E_m$ and a binary event $H$, the
-adjudicator estimates the conditional likelihood ratio
+For completed agents with posterior probability measures $P_i$, the initial
+consensus is the linear opinion pool
 
 $$
-L_j = \frac{P(E_j\mid H,E_1,\ldots,E_{j-1})}
-           {P(E_j\mid \neg H,E_1,\ldots,E_{j-1})}.
+P = \sum_i w_i P_i, \qquad w_i \ge 0, \qquad \sum_i w_i = 1.
 $$
 
-The posterior is calculated from the common prior $p_0$ by
+Weights are equal by default and remain fixed during review. This pools judgments
+without assuming that agents or their evidence are independent. It is not, in
+general, a verified Bayesian posterior for all information. For binary questions
+it pools event probabilities; for multiple choice it pools complete option
+vectors. For numeric and date questions it pools cumulative distribution
+functions (CDFs), not quantiles or fixed outcome bins.
 
-$$
-\frac{p}{1-p} = \frac{p_0}{1-p_0}\prod_{j=1}^m L_j.
-$$
+Numeric, discrete-numeric, and date agents express distributions using ordered interior quantiles.
+The CDF is linear between quantiles and, for a closed tail, linear to the
+question's bound. For an open tail it decays exponentially beyond the nearest
+quantile, with scale equal to the adjacent quantile spacing. These interpolation
+and tail rules are explicit modeling assumptions, not facts determined by the
+quantiles. Open tails are not truncated in the underlying pooled distribution.
+Representing the pool for external consumption uses a finite set of quantiles
+and can introduce additional approximation. For discrete numeric questions,
+this is a latent continuous CDF: the platform maps it to its discrete buckets,
+rather than the ensemble claiming a continuous outcome is possible. Convergence
+uses the latent CDF difference, a conservative bound at any common bucket cut.
 
-For mutually exclusive outcomes $H_i$, the adjudicator instead supplies a
-positive conditional likelihood weight $w_{ij}$ for each outcome and group,
-proportional to $P(E_j\mid H_i,E_1,\ldots,E_{j-1})$. The resulting distribution is
-
-$$
-P(H_i\mid E_1,\ldots,E_m) =
-\frac{P(H_i)\prod_j w_{ij}}{\sum_k P(H_k)\prod_j w_{kj}}.
-$$
-
-These likelihoods and dependence assumptions are elicited judgments, not
-objectively verified measurements. The adjudicator explains them and handles
-unknown dependence conservatively. Source-overlap checks cannot detect every
-duplicate or dependence. Each revision recomputes from its selected prior and
-complete evidence ledger, not from the previous posterior, avoiding repeated
-updates on the same evidence.
+For conditional questions, each agent supplies a probability for the condition
+and outcome distributions assuming that it is true and false. The ensemble
+pools these joint distributions, then derives the condition, conditional outcome,
+and unconditional outcome distributions. The weights within each conditional
+branch depend on each agent's condition probability. A zero-probability branch
+cannot define a conditional distribution and causes the ensemble to fail closed.
 
 ## Review, convergence, and output
 
-The proposing perspectives review the common prior, evidence ledger, dependence
-assumptions, and posterior independently. They flag errors and propose changes;
-their critiques are not themselves new evidence factors. The adjudicator
-considers the reviews and may revise the prior, groups, or likelihoods. A round
-converges only when every completed reviewer accepts the forecast they reviewed
-and the newly calculated posterior changes by no more than the configured
-tolerance. For multiple-choice questions, change is the largest absolute change
-among the option probabilities.
+The proposing perspectives independently review the consensus, other agents'
+priors, posteriors, evidence, dependence assumptions, and models. They flag
+errors and may revise their own posteriors with reasons; a critique is not itself
+a new evidence factor. Each round recomputes the pool from the agents' current
+posteriors and fixed weights, rather than repeatedly pooling an earlier consensus.
+A round converges only when every completed reviewer accepts the forecast they
+reviewed and the new consensus changes by no more than the configured tolerance.
+Change is the absolute probability difference for binary questions, the largest
+option-probability difference for multiple choice, or the largest CDF difference
+for numeric and date questions. For conditional questions it is the largest
+change across the condition and all derived outcome distributions. Numerical
+comparison includes tails and uses a bounded approximation.
 
 Both proposal and review stages require a configured quorum and the economic and
 causal modeling roles. If a required stage fails or the ensemble does not
@@ -118,7 +122,9 @@ converge within the allowed rounds, it fails without publishing a forecast.
 Agreement and numerical stability do not establish that the assumptions are
 correct.
 
-The final result includes the forecast, research, and rationale: the prior,
-posterior, evidence and sources, exclusions, dependence assumptions, model
-artifacts, and remaining limitations. Probability bounds may be applied to the
-reported prediction; the underlying posterior is retained separately.
+The final result includes the forecast, research, and rationale: agent priors and
+posteriors, evidence and sources, dependence assumptions, review and revision
+history, weights, model artifacts, and remaining limitations. Probability bounds
+and platform conversion may be applied to the reported prediction; the
+underlying pooled judgments are retained separately. The pool, its stability, and
+reviewer agreement do not guarantee calibration or correctness.

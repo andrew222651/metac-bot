@@ -1,9 +1,12 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import cast
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from forecasting_tools import BinaryQuestion, BinaryReport
+from forecasting_tools import BinaryQuestion, BinaryReport, NumericQuestion
+from forecasting_tools.data_models.data_organizer import DataOrganizer
+from test_bayesian import FakeOpenCode
 from metac_bot.infrastructure import runner as main
 from metac_bot.forecasting.implementation import jobs
 from metac_bot.infrastructure.config import RunConfig
@@ -11,6 +14,31 @@ from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLE
 
 
 class RunnerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_numeric_default_ensemble_reaches_publication(self) -> None:
+        question = NumericQuestion(
+            question_text="How many?",
+            lower_bound=0,
+            upper_bound=100,
+            open_lower_bound=False,
+            open_upper_bound=False,
+        )
+        report_type = DataOrganizer.get_report_type_for_question_type(type(question))
+        client = FakeOpenCode()
+        metaculus = MagicMock()
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+            patch.object(
+                report_type, "publish_report_to_metaculus", new_callable=AsyncMock
+            ) as publish,
+        ):
+            result = await main.forecast_question(
+                cast(main.OpenCode, client), metaculus, question, RunConfig()
+            )
+            self.assertNotIsInstance(result, Exception)
+            publish.assert_awaited_once()
+            self.assertEqual(len(client.sessions), 14)
+
     async def test_environment_failure_returns_without_starting_opencode(self) -> None:
         with (
             patch.object(main, "check_environment", side_effect=SystemExit(1)),

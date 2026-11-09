@@ -48,11 +48,10 @@ def get_bayesian_stage(stage_id: str) -> dict:
 
 @mcp.tool()
 def record_bayesian_stage(stage_id: str, result: dict) -> dict:
-    """Validate and save the assigned proposal, review, or decision. Never publishes.
+    """Validate and save the assigned ensemble proposal or review. Never publishes.
 
     Use the schema from get_bayesian_stage. Fix validation errors and retry.
-    Decision groups must account for every candidate exactly once; the same
-    normalized source URL must not occur in separate groups.
+    Priors and posteriors must match the exact question-specific schema.
     """
     return record_stage(stage_id, result)
 
