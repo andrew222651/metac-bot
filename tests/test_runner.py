@@ -11,7 +11,7 @@ from metac_bot.forecasting.principles import SUPERFORECASTING_PRINCIPLES
 
 
 class RunnerTests(unittest.IsolatedAsyncioTestCase):
-    async def test_environment_failure_returns_without_starting_opencode(self):
+    async def test_environment_failure_returns_without_starting_opencode(self) -> None:
         with (
             patch.object(main, "check_environment", side_effect=SystemExit(1)),
             patch.object(main, "connect_for_run") as connect,
@@ -19,7 +19,7 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await main.run(RunConfig()), 1)
             connect.assert_not_called()
 
-    async def test_tournament_selection_skips_previous_and_deduplicates(self):
+    async def test_tournament_selection_skips_previous_and_deduplicates(self) -> None:
         seen = BinaryQuestion(
             question_text="Already forecast",
             id_of_post=1,
@@ -39,7 +39,7 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await main.select_questions(client, RunConfig()), [new])
         self.assertEqual(client.get_all_open_questions_from_tournament.call_count, 2)
 
-    async def test_empty_tournament_does_not_start_opencode(self):
+    async def test_empty_tournament_does_not_start_opencode(self) -> None:
         client = MagicMock()
         client.get_all_open_questions_from_tournament.return_value = []
         with (
@@ -52,7 +52,7 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await main.run(RunConfig()), 0)
             connect.assert_not_called()
 
-    async def exercise(self, dry_run, record=True):
+    async def exercise(self, dry_run: bool, record: bool = True) -> tuple[int, int]:
         question = BinaryQuestion(
             question_text="Test",
             id_of_post=1,
@@ -67,7 +67,7 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
         client.create_session.return_value = "ses_test"
         client.messages.return_value = {"data": []}
 
-        async def record_result(*args):
+        async def record_result(*args: object) -> None:
             if record:
                 job_id = next(jobs.JOBS.iterdir()).name
                 jobs.save_forecast(job_id, {"probability": 0.4}, "Research", "Reason")
@@ -93,16 +93,16 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(SUPERFORECASTING_PRINCIPLES, client.prompt.await_args.args[1])
             return result, publish.await_count
 
-    async def test_dry_run_never_publishes(self):
+    async def test_dry_run_never_publishes(self) -> None:
         self.assertEqual(await self.exercise(dry_run=True), (0, 0))
 
-    async def test_valid_forecast_is_published_once(self):
+    async def test_valid_forecast_is_published_once(self) -> None:
         self.assertEqual(await self.exercise(dry_run=False), (0, 1))
 
-    async def test_prose_without_recorded_forecast_fails(self):
+    async def test_prose_without_recorded_forecast_fails(self) -> None:
         self.assertEqual(await self.exercise(dry_run=False, record=False), (1, 0))
 
-    async def test_binary_ensemble_dry_run_saves_without_publishing(self):
+    async def test_binary_ensemble_dry_run_saves_without_publishing(self) -> None:
         question = BinaryQuestion(question_text="Test", id_of_post=1, id_of_question=2)
         metaculus = MagicMock()
         metaculus.get_all_open_questions_from_tournament.return_value = [question]

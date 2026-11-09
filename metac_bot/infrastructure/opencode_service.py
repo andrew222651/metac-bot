@@ -1,6 +1,7 @@
 """Start and stop a private OpenCode server for each forecasting run."""
 
 import asyncio
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 import json
 import logging
@@ -30,7 +31,7 @@ def _copy_config(
     destination_home.mkdir(parents=True)
     if source.is_dir():
 
-        def ignore_service_files(directory, names):
+        def ignore_service_files(directory: str, names: list[str]) -> list[str]:
             return (
                 [
                     name
@@ -74,7 +75,10 @@ def _copy_config(
     path.write_text(json.dumps(config, indent=2), encoding="utf-8")
 
 
-async def _startup(process, timeout: float) -> tuple[str, str]:
+async def _startup(
+    process: asyncio.subprocess.Process, timeout: float
+) -> tuple[str, str]:
+    assert process.stdout is not None
     url = password = None
     try:
         async with asyncio.timeout(timeout):
@@ -103,7 +107,7 @@ async def _startup(process, timeout: float) -> tuple[str, str]:
     return url, password
 
 
-async def _drain(stream) -> None:
+async def _drain(stream: asyncio.StreamReader) -> None:
     while await stream.read(8192):
         pass
 
@@ -160,8 +164,8 @@ async def connect_for_run(
     *,
     api_timeout: float,
     startup_timeout: float,
-    client_factory=OpenCode,
-):
+    client_factory: Callable[..., OpenCode] = OpenCode,
+) -> AsyncGenerator[OpenCode]:
     """Run an authenticated private server and clean it up after the forecast."""
     settings = ConnectionSettings()
     key = (
@@ -218,6 +222,7 @@ async def connect_for_run(
         drain = None
         try:
             url, password = await _startup(process, startup_timeout)
+            assert process.stdout is not None
             drain = asyncio.create_task(_drain(process.stdout))
             async with client_factory(
                 url, httpx.BasicAuth("opencode", password), timeout=api_timeout

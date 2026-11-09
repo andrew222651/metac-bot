@@ -14,12 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]
 ACTION = yaml.safe_load((ROOT / ".github/actions/run-forecast/action.yaml").read_text())
 
 
-def step_script(workflow, name):
+def step_script(workflow: list[dict], name: str) -> str:
     return next(step["run"] for step in workflow if step.get("name") == name)
 
 
 class CiConfigurationTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.directory = TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.base = Path(self.directory.name)
@@ -47,7 +47,7 @@ class CiConfigurationTests(unittest.TestCase):
             "OPENCODE_SEARCH_PROVIDER": "exa",
         }
 
-    def run_step(self, script):
+    def run_step(self, script: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["bash", "-e", "-c", script],
             cwd=ROOT,
@@ -59,7 +59,7 @@ class CiConfigurationTests(unittest.TestCase):
 
     def test_validation_does_not_touch_opencode_configuration_or_start_shared_service(
         self,
-    ):
+    ) -> None:
         target = self.base / "config/opencode/opencode.json"
         target.parent.mkdir(parents=True)
         target.write_text('{"custom": true}')
@@ -70,7 +70,7 @@ class CiConfigurationTests(unittest.TestCase):
         self.assertEqual(target.read_text(), '{"custom": true}')
         self.assertFalse(self.log.exists())
 
-    def test_provider_and_model_are_validated_before_service_start(self):
+    def test_provider_and_model_are_validated_before_service_start(self) -> None:
         script = step_script(ACTION["runs"]["steps"], "Validate forecast settings")
         self.env["OPENCODE_SEARCH_PROVIDER"] = 'random"},"permissions":[]'
         result = self.run_step(script)
@@ -81,7 +81,7 @@ class CiConfigurationTests(unittest.TestCase):
         self.assertNotEqual(self.run_step(script).returncode, 0)
         self.assertFalse(self.log.exists())
 
-    def test_forecast_values_remain_environment_data_not_shell_code(self):
+    def test_forecast_values_remain_environment_data_not_shell_code(self) -> None:
         marker = self.base / "injected"
         self.env.update(
             {
@@ -98,7 +98,7 @@ class CiConfigurationTests(unittest.TestCase):
         self.assertIn("ENV_CONCURRENCY=3", args)
         self.assertNotIn("--timeout", args)
 
-    def test_forecast_uses_defaults_when_environment_values_are_missing(self):
+    def test_forecast_uses_defaults_when_environment_values_are_missing(self) -> None:
         self.env["FORECAST_MODE"] = "tournament"
         self.env.pop("METAC_BOT_SESSION_TIMEOUT", None)
         self.env.pop("METAC_BOT_ENSEMBLE_CONCURRENCY", None)
@@ -108,7 +108,7 @@ class CiConfigurationTests(unittest.TestCase):
         self.assertNotIn("--timeout", args)
         self.assertNotIn("--ensemble-concurrency", args)
 
-    def test_forecast_passes_both_modes_to_runner(self):
+    def test_forecast_passes_both_modes_to_runner(self) -> None:
         for mode in ("test_questions", "tournament"):
             with self.subTest(mode=mode):
                 self.log.unlink(missing_ok=True)
@@ -118,7 +118,7 @@ class CiConfigurationTests(unittest.TestCase):
                 args = self.log.read_text().splitlines()
                 self.assertEqual(args[args.index("--mode") + 1], mode)
 
-    def test_run_bot_workflow_offers_dispatch_inputs(self):
+    def test_run_bot_workflow_offers_dispatch_inputs(self) -> None:
         data = yaml.safe_load((ROOT / ".github/workflows/run_bot.yaml").read_text())
         # PyYAML's YAML 1.1 parser interprets the key "on" as True.
         inputs = data[True]["workflow_dispatch"]["inputs"]

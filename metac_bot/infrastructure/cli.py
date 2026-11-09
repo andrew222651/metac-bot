@@ -136,7 +136,7 @@ class CommonOptions:
             seen.add(role)
             models[role] = role_model
 
-        def choose(value, default):
+        def choose(value: Any, default: Any) -> Any:
             return default if value is None else value
 
         return RunConfig(

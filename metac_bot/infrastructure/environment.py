@@ -137,10 +137,6 @@ class EnvironmentSettings(ConnectionSettings):
         None,
         description="Metaculus bot token; required for tournament runs, not one-off forecasts.",
     )
-    LIGHTNINGROD_API_KEY: SecretStr | None = Field(
-        None, description="API key for the optional LightningRod integration."
-    )
-
     METAC_BOT_VENV: str | None = Field(
         None,
         description="Termux Debian virtualenv path; defaults to /root/.venvs/metac-bot.",

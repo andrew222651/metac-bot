@@ -3,12 +3,13 @@
 from datetime import datetime, timezone
 from typing import Callable
 
+from ..infrastructure.opencode import OpenCode
 from ..infrastructure.paths import ROOT
 from .principles import SUPERFORECASTING_PRINCIPLES
 
 
 async def run_agent(
-    opencode,
+    opencode: OpenCode,
     *,
     title: str,
     prompt: str,

@@ -1,4 +1,4 @@
-An OpenCode-first bot for [Metaculus FutureEval](https://www.metaculus.com/futureeval/participate/).
+A bot for [Metaculus FutureEval](https://www.metaculus.com/futureeval/participate/).
 
 Other open-source bots are listed [here](https://www.metaculus.com/notebooks/38928/futureeval-resources-page/#open-source-bots).
 
@@ -14,9 +14,8 @@ bash scripts/install.sh
 The installer installs missing tools and creates a Debian Trixie container if needed, then installs Python and the locked dependencies there.
 Set `METAC_BOT_VENV` to override the default `/root/.venvs/metac-bot` environment.
 
-Connect a model and search provider in OpenCode. Each forecast starts its own OpenCode server, loads the bot's agents, skills, and `metaculus` and `research` tools, and stops the server afterward. These are not added to your shared OpenCode server. If the tools fail to connect, check that installation completed and run the command from the repository directory.
+Each forecasting run starts its own private OpenCode server, loads the bot's agents, skills, and `metaculus` and `research` tools, and stops the server afterward. You do not need to start or configure a shared server. The private server normally uses your saved OpenCode configuration and provider accounts; alternatively, provide model and search credentials through environment variables or the `.env` file described below. Select a model with `--model` or `OPENCODE_MODEL`, and optionally set `OPENCODE_SEARCH_PROVIDER` to choose a search provider.
 
-If the shared OpenCode server already loaded this project's tools before the change, run `opencode reload` from the repository after resolving any pending permission requests and forms; reload cancels them.
 
 ## Run a test or one-off forecast in Termux
 
@@ -47,7 +46,7 @@ Remove `--dry-run` only if you want to publish to the testing area. Reports and 
 
 CLI options override matching environment variables. The private server normally uses your saved OpenCode provider accounts. An explicit `OPENROUTER_API_KEY` uses an isolated account database without changing your saved account; other saved provider accounts are unavailable to it and need environment keys if used. In that case, session history is temporary, but forecast artifacts remain in `forecast_runs/`. An explicit `OPENCODE_SEARCH_PROVIDER` applies only to the private server.
 
-## Configure secrets in GitHub
+## Configure secrets and variables in GitHub
 
 In your repository, open **Settings → Secrets and variables → Actions → Secrets** and add:
 
@@ -77,5 +76,3 @@ After configuring secrets, open **Actions → Run bot → Run workflow**, choose
 ## Participate in a Metaculus competition in GitHub Actions
 
 After configuring secrets, open **Actions → Run bot**. Scheduled runs forecast on the AI tournament and MiniBench every 20 minutes, skipping questions already forecast. To start a competition run manually, choose **Run workflow** and select `tournament`; the manual default is the testing area.
-
-The workflow publishes forecasts and comments, installs OpenCode and dependencies, and uploads `forecast_runs/` as an artifact. Disable it in GitHub Actions if you do not want it to run automatically. If publication fails, check Metaculus before retrying because a prediction may have been submitted before its comment failed.

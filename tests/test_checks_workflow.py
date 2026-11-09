@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ChecksWorkflowTests(unittest.TestCase):
-    def test_code_checks_run_on_push(self):
+    def test_code_checks_run_on_push(self) -> None:
         workflows = ROOT / ".github/workflows"
         workflow = yaml.safe_load((workflows / "checks.yaml").read_text())
         # PyYAML treats the YAML 1.1 key "on" as True.
@@ -37,7 +37,7 @@ class ChecksWorkflowTests(unittest.TestCase):
         # Local discovery must not recurse into the slow suite.
         self.assertFalse((ROOT / "tests/slow/__init__.py").exists())
 
-    def test_forecasts_are_scheduled_and_test_can_be_run_manually(self):
+    def test_forecasts_are_scheduled_and_test_can_be_run_manually(self) -> None:
         workflows = ROOT / ".github/workflows"
         workflow = yaml.safe_load((workflows / "run_bot.yaml").read_text())
         triggers = workflow[True]

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InstallerTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.directory = TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.base = Path(self.directory.name)
@@ -61,14 +61,19 @@ done
 """,
         )
 
-    def executable(self, name, text):
+    def executable(self, name: str, text: str) -> None:
         path = self.bin / name
         path.write_text(text)
         path.chmod(0o755)
 
     def run_installer(
-        self, *, termux=True, container="present", python="present", args=()
-    ):
+        self,
+        *,
+        termux: bool = True,
+        container: str = "present",
+        python: str = "present",
+        args: tuple[str, ...] = (),
+    ) -> subprocess.CompletedProcess[str]:
         env = {
             **os.environ,
             "PATH": f"{self.bin}:/usr/bin:/bin",
@@ -90,10 +95,10 @@ done
             timeout=15,
         )
 
-    def calls(self):
+    def calls(self) -> list[str]:
         return self.log.read_text().splitlines() if self.log.exists() else []
 
-    def test_fresh_termux_creates_container_and_installs_python(self):
+    def test_fresh_termux_creates_container_and_installs_python(self) -> None:
         result = self.run_installer(container="missing", python="missing")
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.calls()
@@ -113,7 +118,7 @@ done
             )
         )
 
-    def test_existing_termux_container_is_reused_without_apt(self):
+    def test_existing_termux_container_is_reused_without_apt(self) -> None:
         result = self.run_installer(args=("--all-groups",))
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.calls()
@@ -128,7 +133,7 @@ done
             )
         )
 
-    def test_incompatible_existing_python_is_not_replaced(self):
+    def test_incompatible_existing_python_is_not_replaced(self) -> None:
         result = self.run_installer(python="incompatible")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("needs Python 3.11", result.stderr)
@@ -136,7 +141,7 @@ done
             any("apt-get" in call or "uv sync" in call for call in self.calls())
         )
 
-    def test_linux_uses_same_command_without_proot(self):
+    def test_linux_uses_same_command_without_proot(self) -> None:
         result = self.run_installer(termux=False, args=("--all-groups",))
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.calls()
@@ -144,7 +149,7 @@ done
         self.assertTrue(calls[0].startswith("uv sync --locked --inexact --project "))
         self.assertIn("--all-groups", calls[0])
 
-    def test_termux_installs_missing_uv_and_proot(self):
+    def test_termux_installs_missing_uv_and_proot(self) -> None:
         (self.bin / "uv").unlink()
         (self.bin / "proot-distro").unlink()
         result = self.run_installer()
@@ -153,20 +158,20 @@ done
         self.assertIn("pkg install -y uv proot-distro", calls)
         self.assertTrue(any("uv sync --locked --inexact" in call for call in calls))
 
-    def test_termux_installs_only_the_missing_tool(self):
+    def test_termux_installs_only_the_missing_tool(self) -> None:
         (self.bin / "uv").unlink()
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("pkg install -y uv", self.calls())
         self.assertNotIn("pkg install -y uv proot-distro", self.calls())
 
-    def test_termux_installs_missing_proot_only(self):
+    def test_termux_installs_missing_proot_only(self) -> None:
         (self.bin / "proot-distro").unlink()
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("pkg install -y proot-distro", self.calls())
 
-    def test_termux_reports_missing_package_manager(self):
+    def test_termux_reports_missing_package_manager(self) -> None:
         (self.bin / "uv").unlink()
         (self.bin / "pkg").unlink()
         result = self.run_installer()
@@ -174,14 +179,14 @@ done
         self.assertIn("Termux package manager", result.stderr)
         self.assertEqual(self.calls(), [])
 
-    def test_linux_still_requires_uv(self):
+    def test_linux_still_requires_uv(self) -> None:
         (self.bin / "uv").unlink()
         result = self.run_installer(termux=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("uv is required on Linux/macOS", result.stderr)
         self.assertEqual(self.calls(), [])
 
-    def test_invalid_arguments_fail_without_changing_environment(self):
+    def test_invalid_arguments_fail_without_changing_environment(self) -> None:
         result = self.run_installer(args=("--unexpected",))
         self.assertEqual(result.returncode, 2)
         self.assertEqual(self.calls(), [])

@@ -332,20 +332,20 @@ def _make_result(
 
 
 async def run_ensemble(
-    opencode,
-    question,
-    job_id,
+    opencode: Any,
+    question: BinaryQuestion | MultipleChoiceQuestion,
+    job_id: str,
     *,
-    model=None,
-    timeout=900,
-    concurrency=2,
-    min_members=3,
-    review_rounds=3,
-    tolerance=0.01,
-    member_models=None,
-    adjudicator_model=None,
-    stage_timeouts=None,
-):
+    model: str | None = None,
+    timeout: float = 900,
+    concurrency: int = 2,
+    min_members: int = 3,
+    review_rounds: int = 3,
+    tolerance: float = 0.01,
+    member_models: dict[str, str] | None = None,
+    adjudicator_model: str | None = None,
+    stage_timeouts: dict[str, float | None] | None = None,
+) -> dict:
     settings = EnsembleSettings(
         model=model,
         timeout=timeout,

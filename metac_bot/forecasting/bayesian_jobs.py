@@ -1,6 +1,6 @@
 """Isolated stage artifacts exposed to agents by opaque UUID."""
 
-from forecasting_tools import MultipleChoiceQuestion
+from forecasting_tools import MetaculusQuestion, MultipleChoiceQuestion
 
 from . import jobs
 from .bayesian import CHOICE_SCHEMAS, SCHEMAS, validate_stage
@@ -16,7 +16,7 @@ def _stage_state(stage_id: str) -> tuple[dict, list[str] | None]:
     return jobs.read_json(path / "stage.json"), stage_options(stage_id)
 
 
-def create_stage(question, stage: str, context: dict) -> str:
+def create_stage(question: MetaculusQuestion, stage: str, context: dict) -> str:
     if stage not in SCHEMAS:
         raise ValueError("Unknown stage")
     stage_id = jobs.create_job(question)

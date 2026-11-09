@@ -9,6 +9,7 @@ from forecasting_tools import (
     ConditionalPrediction,
     ConditionalQuestion,
     DateQuestion,
+    ForecastReport,
     MetaculusQuestion,
     MultipleChoiceQuestion,
     NumericDistribution,
@@ -84,7 +85,7 @@ def finite_number(value: Any) -> float:
     return float(value)
 
 
-def build_prediction(question: MetaculusQuestion, prediction: dict):
+def build_prediction(question: MetaculusQuestion, prediction: dict) -> Any:
     # Validate the exact question-specific shape before translating to SDK models.
     from jsonschema import validate
 
@@ -155,7 +156,7 @@ def build_prediction(question: MetaculusQuestion, prediction: dict):
 
 def build_report(
     question: MetaculusQuestion, prediction: dict, research: str, rationale: str
-):
+) -> ForecastReport:
     if not research.strip() or not rationale.strip():
         raise ValueError("Research and rationale must both be nonempty")
     report_type = DataOrganizer.get_report_type_for_question_type(type(question))

@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Iterable
 import math
 from pathlib import Path
 import re
@@ -19,7 +20,7 @@ from metac_bot.forecasting.ensemble import EnsembleSettings, run_ensemble
 from metac_bot.forecasting.principles import SUPERFORECASTING_PRINCIPLES
 
 
-def proposal(url="https://example.org/a"):
+def proposal(url: str = "https://example.org/a") -> dict:
     return {
         "prior": 0.2,
         "prior_rationale": "Historical baseline",
@@ -37,7 +38,7 @@ def proposal(url="https://example.org/a"):
     }
 
 
-def decision(ids, lr=2):
+def decision(ids: list[str], lr: float = 2) -> dict:
     return {
         "prior": 0.2,
         "prior_rationale": "Common prior",
@@ -54,7 +55,7 @@ def decision(ids, lr=2):
     }
 
 
-def choice_proposal(options):
+def choice_proposal(options: list[str]) -> dict:
     result = proposal()
     result["prior"] = {option: 1 / len(options) for option in options}
     evidence = result["evidence"][0]
@@ -65,7 +66,7 @@ def choice_proposal(options):
     return result
 
 
-def choice_decision(ids, options):
+def choice_decision(ids: list[str], options: list[str]) -> dict:
     return {
         "prior": {option: 1 / len(options) for option in options},
         "prior_rationale": "Equal prior for the synthetic fixture",
@@ -84,7 +85,7 @@ def choice_decision(ids, options):
     }
 
 
-def model_artifact(kind):
+def model_artifact(kind: str) -> dict:
     return {
         "kind": kind,
         "applicable": True,
@@ -99,7 +100,7 @@ def model_artifact(kind):
 
 
 class BayesianTests(unittest.TestCase):
-    def test_ensemble_settings_choose_role_models_and_stage_timeouts(self):
+    def test_ensemble_settings_choose_role_models_and_stage_timeouts(self) -> None:
         settings = EnsembleSettings(
             model="provider/default",
             timeout=600,
@@ -113,7 +114,7 @@ class BayesianTests(unittest.TestCase):
         self.assertEqual(settings.timeout_for("proposal"), 600)
         self.assertEqual(settings.timeout_for("review"), 900)
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.candidates = candidates_from_proposals(
             [
                 {"role": "a", "result": proposal("https://example.org/a?utm_source=x")},
@@ -121,14 +122,14 @@ class BayesianTests(unittest.TestCase):
             ]
         )
 
-    def test_bayes_and_recompute_from_prior(self):
+    def test_bayes_and_recompute_from_prior(self) -> None:
         update = decision(["p1-e1", "p2-e1"])
         first = calculate_posterior(update, self.candidates)
         second = calculate_posterior(update, self.candidates)
         self.assertAlmostEqual(first["posterior"], 1 / 3)
         self.assertEqual(first, second)
 
-    def test_categorical_update_and_scale_invariance(self):
+    def test_categorical_update_and_scale_invariance(self) -> None:
         options = ["A", "B", "C"]
         candidates = candidates_from_proposals(
             [{"role": "a", "result": choice_proposal(options)}], options
@@ -147,7 +148,7 @@ class BayesianTests(unittest.TestCase):
                 result["posterior"][option], scaled["posterior"][option]
             )
 
-    def test_categorical_vectors_are_complete_and_valid(self):
+    def test_categorical_vectors_are_complete_and_valid(self) -> None:
         options = ["A", "B"]
         candidate = candidates_from_proposals(
             [{"role": "a", "result": choice_proposal(options)}], options
@@ -167,7 +168,7 @@ class BayesianTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "sum to 1"):
             calculate_choice_posterior(update, candidate, options)
 
-    def test_categorical_duplicate_sources_are_not_independent(self):
+    def test_categorical_duplicate_sources_are_not_independent(self) -> None:
         options = ["A", "B"]
         candidates = candidates_from_proposals(
             [
@@ -181,13 +182,13 @@ class BayesianTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "same source"):
             calculate_choice_posterior(update, candidates, options)
 
-    def test_duplicate_source_cannot_be_independent(self):
+    def test_duplicate_source_cannot_be_independent(self) -> None:
         update = decision(["p1-e1"])
         update["groups"].append({**update["groups"][0], "candidate_ids": ["p2-e1"]})
         with self.assertRaisesRegex(ValueError, "same source"):
             calculate_posterior(update, self.candidates)
 
-    def test_candidates_must_all_be_assigned_once(self):
+    def test_candidates_must_all_be_assigned_once(self) -> None:
         for update in [
             decision(["p1-e1"]),
             decision(["p1-e1", "p1-e1", "p2-e1"]),
@@ -196,7 +197,7 @@ class BayesianTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 calculate_posterior(update, self.candidates)
 
-    def test_excluded_candidate_and_invalid_numbers(self):
+    def test_excluded_candidate_and_invalid_numbers(self) -> None:
         update = decision(["p1-e1"])
         update["excluded"] = [{"candidate_id": "p2-e1", "reason": "Duplicate"}]
         self.assertAlmostEqual(
@@ -207,13 +208,13 @@ class BayesianTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 calculate_posterior(update, self.candidates)
 
-    def test_extreme_posterior_is_clipped_only_for_publication(self):
+    def test_extreme_posterior_is_clipped_only_for_publication(self) -> None:
         update = decision(["p1-e1", "p2-e1"], math.exp(20))
         result = calculate_posterior(update, self.candidates)
         self.assertGreater(result["posterior"], 0.99)
         self.assertEqual(result["published_probability"], 0.99)
 
-    def test_modeler_must_record_the_right_model_kind(self):
+    def test_modeler_must_record_the_right_model_kind(self) -> None:
         for role, kind in [
             ("economic-modeler", "economic"),
             ("causal-modeler", "causal"),
@@ -235,25 +236,32 @@ class BayesianTests(unittest.TestCase):
 
 
 class FakeOpenCode:
-    def __init__(self, fail_labels=()):
+    def __init__(self, fail_labels: Iterable[str] = ()) -> None:
         self.sessions = {}
         self.fail_labels = set(fail_labels)
         self.active = 0
         self.max_active = 0
         self.prompts = []
 
-    async def create_session(self, directory, title, model, *, agent=None):
+    async def create_session(
+        self,
+        directory: Path,
+        title: str,
+        model: str | None,
+        *,
+        agent: str | None = None,
+    ) -> str:
         session = f"s{len(self.sessions)}"
         self.sessions[session] = {"title": title, "model": model, "agent": agent}
         return session
 
-    async def prompt(self, session, text):
+    async def prompt(self, session: str, text: str) -> None:
         match = re.search(r"stage ([0-9a-f-]{36})", text)
         assert match is not None
         self.sessions[session]["stage_id"] = match.group(1)
         self.prompts.append(text)
 
-    async def wait(self, session, timeout):
+    async def wait(self, session: str, timeout: float) -> None:
         self.sessions[session]["timeout"] = timeout
         self.active += 1
         self.max_active = max(self.active, self.max_active)
@@ -287,7 +295,7 @@ class FakeOpenCode:
 
 
 class EnsembleTests(unittest.IsolatedAsyncioTestCase):
-    async def test_multiple_choice_runs_complete_ensemble(self):
+    async def test_multiple_choice_runs_complete_ensemble(self) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -315,7 +323,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 question.options,
             )
 
-    async def test_complete_round_and_independence(self):
+    async def test_complete_round_and_independence(self) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -388,7 +396,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("proposals", context)
                 self.assertNotIn("prior", context)
 
-    async def test_quorum_failure_never_creates_forecast(self):
+    async def test_quorum_failure_never_creates_forecast(self) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -411,7 +419,9 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 )
             self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
 
-    async def test_required_modeler_failure_prevents_result_despite_quorum(self):
+    async def test_required_modeler_failure_prevents_result_despite_quorum(
+        self,
+    ) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -425,7 +435,9 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("simulated failure", str(exc.exception))
             self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
 
-    async def test_required_modeler_review_failure_prevents_result_despite_quorum(self):
+    async def test_required_modeler_review_failure_prevents_result_despite_quorum(
+        self,
+    ) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -435,7 +447,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             client = FakeOpenCode()
             original_wait = client.wait
 
-            async def fail_causal_review(session, timeout):
+            async def fail_causal_review(session: str, timeout: float) -> None:
                 if (
                     client.sessions[session]["title"]
                     == "Bayesian review: causal-modeler"
@@ -450,7 +462,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                     await run_ensemble(client, question, job_id)
             self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
 
-    async def test_review_quorum_failure_prevents_result(self):
+    async def test_review_quorum_failure_prevents_result(self) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -460,7 +472,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             client = FakeOpenCode()
             original_wait = client.wait
 
-            async def fail_reviews(session, timeout):
+            async def fail_reviews(session: str, timeout: float) -> None:
                 if "review:" in client.sessions[session]["title"]:
                     raise RuntimeError("Review failure")
                 await original_wait(session, timeout)
@@ -470,7 +482,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                     await run_ensemble(client, question, job_id)
             self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
 
-    async def test_stable_posterior_without_acceptance_fails_closed(self):
+    async def test_stable_posterior_without_acceptance_fails_closed(self) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -480,7 +492,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             client = FakeOpenCode()
             original_wait = client.wait
 
-            async def disagree(session, timeout):
+            async def disagree(session: str, timeout: float) -> None:
                 if "review:" not in client.sessions[session]["title"]:
                     return await original_wait(session, timeout)
                 stage_id = client.sessions[session]["stage_id"]

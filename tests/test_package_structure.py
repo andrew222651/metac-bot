@@ -8,12 +8,12 @@ from metac_bot.infrastructure.paths import ROOT
 
 
 class PackageStructureTests(unittest.TestCase):
-    def test_project_paths_are_independent_of_module_depth(self):
+    def test_project_paths_are_independent_of_module_depth(self) -> None:
         self.assertEqual(ROOT, Path(__file__).resolve().parents[1])
         self.assertEqual(jobs.ROOT, ROOT)
         self.assertEqual(jobs.JOBS, ROOT / "forecast_runs")
 
-    def test_prompts_preserve_role_and_standalone_instructions(self):
+    def test_prompts_preserve_role_and_standalone_instructions(self) -> None:
         self.assertEqual(set(MODEL_ROLES), {"economic-modeler", "causal-modeler"})
         self.assertIn(
             ROLES["economic-modeler"],

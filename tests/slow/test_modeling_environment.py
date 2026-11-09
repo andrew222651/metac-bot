@@ -15,14 +15,14 @@ import sympy as sp
 
 
 class ModelingEnvironmentTests(unittest.TestCase):
-    def test_symbolic_equilibrium_and_linear_regression(self):
+    def test_symbolic_equilibrium_and_linear_regression(self) -> None:
         x = sp.symbols("x")
         self.assertEqual(sp.solve(2 * x - 6, x), [3])
         data = pd.DataFrame({"x": [0.0, 1.0, 2.0, 3.0], "y": [1.0, 3.0, 5.0, 7.0]})
         fitted = sm.OLS(data["y"], sm.add_constant(data["x"])).fit()
         self.assertTrue(np.allclose(fitted.params.to_numpy(), [1.0, 2.0]))
 
-    def test_bayesian_update_and_causal_dag(self):
+    def test_bayesian_update_and_causal_dag(self) -> None:
         # A Beta(2, 2) prior updated with 3 successes and 1 failure.
         self.assertTrue(math.isclose(beta.mean(5, 3), 0.625))
         graph = nx.DiGraph(
@@ -37,7 +37,7 @@ class ModelingEnvironmentTests(unittest.TestCase):
 
 class ModelingLauncherTests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         code = """
 import numpy, scipy, sympy, pandas, statsmodels, networkx
 import pymc as pm
@@ -79,9 +79,9 @@ print('pymc-ready')
             timeout=180,
         )
 
-    def test_launcher_uses_the_scientific_environment(self):
+    def test_launcher_uses_the_scientific_environment(self) -> None:
         self.assertIn("modeling-ready", self.result.stdout, self.result.stderr)
 
-    def test_pymc_samples_a_small_model_through_launcher(self):
+    def test_pymc_samples_a_small_model_through_launcher(self) -> None:
         self.assertEqual(self.result.returncode, 0, self.result.stderr)
         self.assertIn("pymc-ready", self.result.stdout)

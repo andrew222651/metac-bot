@@ -3,6 +3,7 @@
 import asyncio
 from pathlib import Path
 import time
+from typing import Any, Self
 
 import httpx
 
@@ -10,12 +11,19 @@ from .models import model_reference
 
 
 class OpenCode:
-    def __init__(self, url: str, auth=None, *, timeout: float = 30, transport=None):
+    def __init__(
+        self,
+        url: str,
+        auth: httpx.Auth | tuple[str, str] | None = None,
+        *,
+        timeout: float = 30,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
         self.http = httpx.AsyncClient(
             base_url=url, auth=auth, timeout=timeout, transport=transport
         )
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
         try:
             info = await self.request("GET", "/api/info")
             if not info.get("version", "").startswith("2."):
@@ -25,10 +33,10 @@ class OpenCode:
             raise
         return self
 
-    async def __aexit__(self, *args):
+    async def __aexit__(self, *args: object) -> None:
         await self.http.aclose()
 
-    async def request(self, method, path, **kwargs):
+    async def request(self, method: str, path: str, **kwargs: Any) -> Any:
         response = await self.http.request(method, path, **kwargs)
         response.raise_for_status()
         return response.json() if response.content else None
@@ -49,12 +57,12 @@ class OpenCode:
         session = await self.request("POST", "/api/session", json=body)
         return session["data"]["id"]
 
-    async def prompt(self, session_id: str, text: str):
+    async def prompt(self, session_id: str, text: str) -> Any:
         return await self.request(
             "POST", f"/api/session/{session_id}/prompt", json={"text": text}
         )
 
-    async def wait(self, session_id: str, timeout: float = 900):
+    async def wait(self, session_id: str, timeout: float = 900) -> None:
         # Long-poll for completion while reporting pending approvals, rather than
         # silently approving them or hanging an unattended Actions job.
         waiter = asyncio.create_task(
@@ -118,7 +126,7 @@ class OpenCode:
             waiter.cancel()
             await asyncio.gather(waiter, return_exceptions=True)
 
-    async def messages(self, session_id: str):
+    async def messages(self, session_id: str) -> Any:
         return await self.request(
             "GET",
             f"/api/session/{session_id}/message",

@@ -32,7 +32,7 @@ class RunConfig:
     ensemble_models: dict[str, str] = field(default_factory=dict)
     ensemble_adjudicator_model: str | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.mode not in ("tournament", "test_questions"):
             raise ValueError("Invalid tournament mode")
         if (
@@ -77,7 +77,7 @@ class OneOffConfig(RunConfig):
     criteria: str | None = None
     background: str | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__post_init__()
         if not self.dry_run:
             raise ValueError("One-off forecasts cannot be published")

@@ -16,26 +16,26 @@ from metac_bot.infrastructure.paths import ROOT
 
 
 class FakeProcess:
-    def __init__(self):
+    def __init__(self) -> None:
         self.stdout = asyncio.StreamReader()
         self.stdout.feed_data(
             b"server listening on http://127.0.0.1:43210\nserver password fake-password\n"
         )
         self.returncode = None
 
-    def terminate(self):
+    def terminate(self) -> None:
         self.returncode = 0
         self.stdout.feed_eof()
 
-    def kill(self):
+    def kill(self) -> None:
         self.terminate()
 
-    async def wait(self):
+    async def wait(self) -> int:
         return 0
 
 
 class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         ready = patch(
             "metac_bot.infrastructure.opencode_service._wait_for_mcp",
             new_callable=AsyncMock,
@@ -43,7 +43,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
         self.ready = ready.start()
         self.addCleanup(ready.stop)
 
-    async def test_no_explicit_override_starts_private_server(self):
+    async def test_no_explicit_override_starts_private_server(self) -> None:
         client = AsyncMock()
         client.__aenter__.return_value = client
         factory = MagicMock(return_value=client)
@@ -88,7 +88,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
                 self.ready.assert_awaited_once()
             self.assertEqual(process.returncode, 0)
 
-    async def test_mcp_failure_stops_private_server(self):
+    async def test_mcp_failure_stops_private_server(self) -> None:
         self.ready.side_effect = RuntimeError("MCP failed")
         process = FakeProcess()
         client = AsyncMock()
@@ -110,7 +110,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
                     self.fail("must not start a forecast")
         self.assertEqual(process.returncode, 0)
 
-    async def test_in_memory_database_still_starts_private_server(self):
+    async def test_in_memory_database_still_starts_private_server(self) -> None:
         process = FakeProcess()
         client = AsyncMock()
         client.__aenter__.return_value = client
@@ -134,7 +134,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_explicit_key_uses_isolated_database_and_does_not_change_user_config(
         self,
-    ):
+    ) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
             original = root / "user-config/opencode/opencode.jsonc"
@@ -197,7 +197,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_search_only_reuses_saved_account_data_without_creating_credentials(
         self,
-    ):
+    ) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
             process = FakeProcess()
@@ -233,7 +233,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_research_environment_uses_private_server_with_existing_accounts(
         self,
-    ):
+    ) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
             process = FakeProcess()
@@ -267,7 +267,9 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
                     )
                 client.request.assert_not_awaited()
 
-    async def test_search_override_fails_if_higher_precedence_config_conflicts(self):
+    async def test_search_override_fails_if_higher_precedence_config_conflicts(
+        self,
+    ) -> None:
         client = AsyncMock()
         client.request.return_value = [
             {"info": {"websearch": {"provider": "exa"}}},
@@ -276,7 +278,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(RuntimeError, "prevents the requested"):
             await _verify_search(client, "exa")
 
-    async def test_explicit_remote_server_is_not_used(self):
+    async def test_explicit_remote_server_is_not_used(self) -> None:
         env = {
             "OPENCODE_SERVER_URL": "https://example.invalid",
             "OPENCODE_SERVER_PASSWORD": "example-secret",
@@ -303,7 +305,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("OPENCODE_SERVER_PASSWORD", server_env)
             self.assertEqual(process.returncode, 0)
 
-    async def test_wait_for_mcp_requires_both_connected(self):
+    async def test_wait_for_mcp_requires_both_connected(self) -> None:
         client = AsyncMock()
         client.request.side_effect = [
             {"data": []},
@@ -324,7 +326,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
             await _wait_for_mcp(client, 5)
         self.assertEqual(client.request.await_count, 3)
 
-    async def test_wait_for_mcp_fails_on_connection_error(self):
+    async def test_wait_for_mcp_fails_on_connection_error(self) -> None:
         client = AsyncMock()
         client.request.return_value = {
             "data": [{"name": "metaculus", "status": {"status": "failed"}}]
@@ -332,13 +334,13 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(RuntimeError, "metaculus"):
             await _wait_for_mcp(client, 5)
 
-    async def test_wait_for_mcp_times_out(self):
+    async def test_wait_for_mcp_times_out(self) -> None:
         client = AsyncMock()
         client.request.return_value = {"data": []}
         with self.assertRaisesRegex(TimeoutError, "did not connect"):
             await _wait_for_mcp(client, 0.01)
 
-    def test_copy_config_dereferences_symlink_before_override(self):
+    def test_copy_config_dereferences_symlink_before_override(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "original/opencode"
@@ -356,7 +358,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
                 json.loads(real.read_text())["websearch"]["provider"], "exa"
             )
 
-    def test_copy_config_preserves_user_agents_and_skill_sources(self):
+    def test_copy_config_preserves_user_agents_and_skill_sources(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "original/opencode"

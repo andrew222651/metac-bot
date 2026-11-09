@@ -11,7 +11,7 @@ from metac_bot.forecasting.jobs import ROOT, create_job, read_report
 from metac_bot.infrastructure.opencode_service import connect_for_run
 
 
-async def main():
+async def main() -> None:
     job_id = create_job(
         BinaryQuestion(
             question_text="Will a fair coin's next independent toss land heads? (synthetic smoke test)",

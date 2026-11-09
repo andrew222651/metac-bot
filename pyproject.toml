@@ -1,7 +1,6 @@
 [project]
 name = "metac-bot"
 version = "0.1.0"
-description = ""
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
@@ -31,9 +30,6 @@ dependencies = [
 ]
 
 [dependency-groups]
-integrations = [
-    "lightningrod-ai>=0.1.14,<0.2",
-]
 dev = [
     "ipykernel>=6.29.5,<7",
     "ruff>=0.15,<0.16",
@@ -42,4 +38,7 @@ dev = [
 
 [tool.uv]
 exclude-newer = "7 days"
-exclude-newer-package = { forecasting-tools = false }
+
+[tool.ruff.lint]
+extend-select = ["ANN"]
+ignore = ["ANN401"]

@@ -11,7 +11,7 @@ from metac_bot.forecasting.research_mcp import mcp
 
 
 class ResearchTests(unittest.IsolatedAsyncioTestCase):
-    def test_availability_requires_real_complete_credentials(self):
+    def test_availability_requires_real_complete_credentials(self) -> None:
         with patch.dict(
             os.environ,
             {"ASKNEWS_CLIENT_ID": "client", "EXA_API_KEY": "REPLACE_ME"},
@@ -24,7 +24,7 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
             os.environ["ASKNEWS_SECRET"] = "test-secret"
             self.assertTrue(research.available_providers()["asknews"])
 
-    async def test_missing_key_fails_before_network(self):
+    async def test_missing_key_fails_before_network(self) -> None:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch.object(research, "post_json") as post,
@@ -33,8 +33,8 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
                 await research.exa_search("query")
             post.assert_not_called()
 
-    async def test_exa_returns_sources_without_requesting_synthesis(self):
-        def handle(request):
+    async def test_exa_returns_sources_without_requesting_synthesis(self) -> None:
+        def handle(request: httpx.Request) -> httpx.Response:
             self.assertEqual(str(request.url), "https://api.exa.ai/search")
             self.assertEqual(request.headers["authorization"], "Bearer test-key")
             body = json.loads(request.content)
@@ -54,11 +54,11 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
             result = await research.exa_search("query", 3, ["example.org"])
         self.assertEqual(result["results"][0]["text"], "Evidence")
 
-    async def test_perplexity_keeps_sources_annotations_and_usage(self):
+    async def test_perplexity_keeps_sources_annotations_and_usage(self) -> None:
         source = {"url": "https://example.org", "date": "2026-01-01"}
         annotation = {"type": "url_citation", "url": "https://example.org"}
 
-        def handle(request):
+        def handle(request: httpx.Request) -> httpx.Response:
             self.assertEqual(str(request.url), "https://api.perplexity.ai/v1/agent")
             self.assertEqual(
                 json.loads(request.content), {"input": "query", "effort": "high"}
@@ -97,7 +97,7 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["provider_generated"])
         self.assertEqual(result["usage"]["total_tokens"], 123)
 
-    async def test_incomplete_perplexity_response_is_not_success(self):
+    async def test_incomplete_perplexity_response_is_not_success(self) -> None:
         with (
             patch.dict(os.environ, {"PERPLEXITY_API_KEY": "test-key"}, clear=True),
             patch.object(
@@ -110,7 +110,7 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(RuntimeError, "did not complete"):
                 await research.perplexity_research("query")
 
-    async def test_provider_error_does_not_expose_response_body(self):
+    async def test_provider_error_does_not_expose_response_body(self) -> None:
         client = httpx.AsyncClient(
             transport=httpx.MockTransport(
                 lambda request: httpx.Response(
@@ -125,7 +125,7 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
                 )
         self.assertNotIn("test-key", str(error.exception))
 
-    async def test_asknews_uses_original_presets(self):
+    async def test_asknews_uses_original_presets(self) -> None:
         with (
             patch.dict(os.environ, {"ASKNEWS_API_KEY": "test-key"}, clear=True),
             patch("forecasting_tools.AskNewsSearcher") as searcher,
@@ -146,7 +146,7 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertEqual(result["text"], "Research with sources")
 
-    async def test_mcp_catalog_exposes_bounded_provider_tools(self):
+    async def test_mcp_catalog_exposes_bounded_provider_tools(self) -> None:
         tools = {tool.name: tool for tool in await mcp.list_tools()}
         self.assertEqual(
             set(tools),

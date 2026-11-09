@@ -8,8 +8,8 @@ from metac_bot.infrastructure.opencode import OpenCode
 
 
 class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
-    async def test_api_timeout_is_configured(self):
-        def handle(request):
+    async def test_api_timeout_is_configured(self) -> None:
+        def handle(request: httpx.Request) -> httpx.Response:
             self.assertEqual(request.extensions["timeout"]["connect"], 45)
             self.assertEqual(request.extensions["timeout"]["read"], 45)
             return httpx.Response(200, json={"version": "2.0.27"})
@@ -21,8 +21,8 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_named_agent_is_selected_without_overriding_model_or_permissions(
         self,
-    ):
-        def handle(request):
+    ) -> None:
+        def handle(request: httpx.Request) -> httpx.Response:
             if request.url.path == "/api/info":
                 return httpx.Response(200, json={"version": "2.0.27"})
             body = json.loads(request.content)
@@ -38,10 +38,10 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
                 Path("/project"), "Test", agent="causal-modeler"
             )
 
-    async def test_v2_session_prompt_and_wait_contract(self):
+    async def test_v2_session_prompt_and_wait_contract(self) -> None:
         calls = []
 
-        def handle(request):
+        def handle(request: httpx.Request) -> httpx.Response:
             calls.append((request.method, request.url.path))
             if request.url.path == "/api/info":
                 return httpx.Response(200, json={"version": "2.0.27"})
@@ -76,10 +76,10 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
             await client.wait(sid, 5)
         self.assertIn(("POST", "/api/experimental/session/ses_test/wait"), calls)
 
-    async def test_timeout_interrupts_without_retrying_prompt(self):
+    async def test_timeout_interrupts_without_retrying_prompt(self) -> None:
         interrupted = []
 
-        async def handle(request):
+        async def handle(request: httpx.Request) -> httpx.Response:
             if request.url.path.endswith("/wait"):
                 await asyncio.sleep(10)
                 return httpx.Response(204)
@@ -97,10 +97,10 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
                 await client.wait("ses_test", 0.02)
         self.assertEqual(interrupted, [True])
 
-    async def test_session_deadline_bounds_slow_permission_poll(self):
+    async def test_session_deadline_bounds_slow_permission_poll(self) -> None:
         interrupted = []
 
-        async def handle(request):
+        async def handle(request: httpx.Request) -> httpx.Response:
             if request.url.path.endswith("/wait") or request.url.path.endswith(
                 "/permission"
             ):
@@ -117,10 +117,10 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.wait_for(client.wait("ses_test", 0.02), timeout=1)
         self.assertEqual(interrupted, [True])
 
-    async def test_permission_requests_are_not_autoapproved(self):
+    async def test_permission_requests_are_not_autoapproved(self) -> None:
         calls = []
 
-        async def handle(request):
+        async def handle(request: httpx.Request) -> httpx.Response:
             calls.append(request.url.path)
             if request.url.path.endswith("/wait"):
                 await asyncio.sleep(10)
@@ -137,8 +137,8 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(path.endswith("/interrupt") for path in calls))
         self.assertFalse(any(path.endswith("/reply") for path in calls))
 
-    async def test_missing_search_provider_form_is_reported(self):
-        async def handle(request):
+    async def test_missing_search_provider_form_is_reported(self) -> None:
+        async def handle(request: httpx.Request) -> httpx.Response:
             if request.url.path.endswith("/wait"):
                 await asyncio.sleep(10)
                 return httpx.Response(204)

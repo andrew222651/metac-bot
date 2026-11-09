@@ -16,7 +16,7 @@ from metac_bot.forecasting import jobs
 
 
 class ForecastValidationTests(unittest.TestCase):
-    def test_binary_clamps_and_rejects_nonfinite(self):
+    def test_binary_clamps_and_rejects_nonfinite(self) -> None:
         question = BinaryQuestion(question_text="Will it happen?")
         self.assertEqual(build_prediction(question, {"probability": 0}), 0.01)
         self.assertEqual(build_prediction(question, {"probability": 1}), 0.99)
@@ -24,7 +24,7 @@ class ForecastValidationTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(Exception):
                 build_prediction(question, {"probability": value})
 
-    def test_multiple_choice_exact_options_and_total(self):
+    def test_multiple_choice_exact_options_and_total(self) -> None:
         question = MultipleChoiceQuestion(question_text="Which?", options=["A", "B"])
         self.assertEqual(
             build_prediction(question, {"options": {"A": 0.4, "B": 0.6}}).to_dict(),
@@ -34,7 +34,7 @@ class ForecastValidationTests(unittest.TestCase):
             with self.subTest(options=options), self.assertRaises(Exception):
                 build_prediction(question, {"options": options})
 
-    def test_numeric_cdf_and_order(self):
+    def test_numeric_cdf_and_order(self) -> None:
         question = NumericQuestion(
             question_text="How many?",
             lower_bound=0,
@@ -65,7 +65,7 @@ class ForecastValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_prediction(question, prediction)
 
-    def test_date_values_are_utc(self):
+    def test_date_values_are_utc(self) -> None:
         question = DateQuestion(
             question_text="When?",
             lower_bound="2027-01-01T00:00:00Z",
@@ -85,7 +85,7 @@ class ForecastValidationTests(unittest.TestCase):
         self.assertTrue(result.is_date)
         self.assertEqual(result.declared_percentiles[0].value, 1801440000)
 
-    def test_conditional_snapshot_preserves_subtypes(self):
+    def test_conditional_snapshot_preserves_subtypes(self) -> None:
         binary = BinaryQuestion(question_text="Condition?", id_of_question=10)
         numeric = NumericQuestion(
             question_text="Outcome?",
@@ -124,7 +124,7 @@ class ForecastValidationTests(unittest.TestCase):
         self.assertEqual(result.parent, 0.5)
         self.assertEqual(result.prediction_yes.cdf_size, 201)
 
-    def test_job_is_bound_to_snapshot_and_validation_precedes_save(self):
+    def test_job_is_bound_to_snapshot_and_validation_precedes_save(self) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -143,7 +143,9 @@ class ForecastValidationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 jobs.get_job("../../outside")
 
-    def test_failed_atomic_write_preserves_original_and_cleans_temporary_file(self):
+    def test_failed_atomic_write_preserves_original_and_cleans_temporary_file(
+        self,
+    ) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory) / "data.json"
             jobs.write_json(path, {"version": "original"})

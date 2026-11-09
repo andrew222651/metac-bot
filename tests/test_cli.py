@@ -8,7 +8,7 @@ from metac_bot.infrastructure.config import RunConfig
 
 
 class ConfigTests(unittest.TestCase):
-    def test_defaults_and_role_models(self):
+    def test_defaults_and_role_models(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = parse_args(
                 [
@@ -24,11 +24,11 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.ensemble_min_members, 3)
         self.assertEqual(config.ensemble_review_rounds, 3)
 
-    def test_cli_defaults_match_run_config(self):
+    def test_cli_defaults_match_run_config(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(parse_args([]), RunConfig())
 
-    def test_model_defaults_to_environment(self):
+    def test_model_defaults_to_environment(self) -> None:
         with patch.dict(os.environ, {"OPENCODE_MODEL": "openai/example"}, clear=True):
             self.assertEqual(parse_args([]).model, "openai/example")
             self.assertEqual(
@@ -37,7 +37,7 @@ class ConfigTests(unittest.TestCase):
         with patch.dict(os.environ, {"OPENCODE_MODEL": ""}, clear=True):
             self.assertIsNone(parse_args([]).model)
 
-    def test_invalid_options_fail_before_running(self):
+    def test_invalid_options_fail_before_running(self) -> None:
         for argv in [
             ["--mode", "metaculus_cup"],
             ["--timeout", "nan"],
@@ -60,12 +60,12 @@ class ConfigTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     parse_args(argv)
 
-    def test_help_exits_without_starting_a_run(self):
+    def test_help_exits_without_starting_a_run(self) -> None:
         with self.assertRaises(SystemExit) as exc:
             parse_args(["--help"])
         self.assertEqual(exc.exception.code, 0)
 
-    def test_session_and_stage_timeout_options(self):
+    def test_session_and_stage_timeout_options(self) -> None:
         config = parse_args(
             [
                 "--session-timeout",
@@ -86,7 +86,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.ensemble_review_timeout, 800)
         self.assertEqual(config.ensemble_decision_timeout, 900)
 
-    def test_repeated_member_models_are_preserved(self):
+    def test_repeated_member_models_are_preserved(self) -> None:
         config = parse_args(
             [
                 "--ensemble-model",
@@ -99,7 +99,7 @@ class ConfigTests(unittest.TestCase):
             config.ensemble_models, {"skeptic": "provider/a", "base-rate": "provider/b"}
         )
 
-    def test_shared_options_match_between_commands(self):
+    def test_shared_options_match_between_commands(self) -> None:
         options = [
             "--model",
             "provider/default",
@@ -133,7 +133,7 @@ class ConfigTests(unittest.TestCase):
             with self.subTest(option=name):
                 self.assertEqual(getattr(one_off, name), expected)
 
-    def test_programmatic_config_is_validated(self):
+    def test_programmatic_config_is_validated(self) -> None:
         with self.assertRaisesRegex(ValueError, "Invalid tournament mode"):
             RunConfig(mode=cast(Any, "metaculus_cup"))
         with self.assertRaises(ValueError):

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class LauncherTests(unittest.TestCase):
-    def test_launcher_does_not_start_shared_service(self):
+    def test_launcher_does_not_start_shared_service(self) -> None:
         with TemporaryDirectory() as directory:
             base = Path(directory)
             log = base / "calls"

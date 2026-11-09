@@ -2,11 +2,13 @@
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 
 from forecasting_tools import (
     BinaryQuestion,
+    ForecastReport,
     MetaculusClient,
+    MetaculusQuestion,
     MultipleChoiceQuestion,
     PredictedOptionList,
 )
@@ -33,7 +35,9 @@ from .infrastructure.runtime import (
 logger = logging.getLogger(__name__)
 
 
-async def select_questions(metaculus, args: RunConfig):
+async def select_questions(
+    metaculus: MetaculusClient, args: RunConfig
+) -> list[MetaculusQuestion]:
     """Fetch and deduplicate the questions selected by the run mode."""
     tournaments = {
         "tournament": [
@@ -56,7 +60,12 @@ async def select_questions(metaculus, args: RunConfig):
     return selected
 
 
-async def forecast_question(opencode, metaculus, question, args: RunConfig):
+async def forecast_question(
+    opencode: OpenCode,
+    metaculus: MetaculusClient | None,
+    question: MetaculusQuestion,
+    args: RunConfig,
+) -> ForecastReport | Exception:
     """Run one question independently; return either its report or its error."""
     job_id = create_job(question)
     session_id = None
@@ -87,7 +96,7 @@ async def forecast_question(opencode, metaculus, question, args: RunConfig):
             save_forecast(job_id, **result)
         else:
 
-            def record_session(value):
+            def record_session(value: str) -> None:
                 nonlocal session_id
                 session_id = value
                 write_json(job_path(job_id) / "session.json", {"session_id": value})
@@ -104,7 +113,7 @@ async def forecast_question(opencode, metaculus, question, args: RunConfig):
                 prompt=forecast_prompt(job_id, one_off=isinstance(args, OneOffConfig)),
             )
         if not (job_path(job_id) / "forecast.json").exists():
-            messages = await opencode.messages(session_id)
+            messages = await opencode.messages(cast(str, session_id))
             write_json(job_path(job_id) / "messages.json", messages)
             raise RuntimeError(
                 f"OpenCode did not record a forecast; inspect session {session_id}"

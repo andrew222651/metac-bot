@@ -2,7 +2,10 @@
 
 import json
 from pathlib import Path
+from typing import Any
 from uuid import UUID, uuid4
+
+from forecasting_tools import ForecastReport, MetaculusQuestion
 
 from ..infrastructure.paths import ROOT
 from .domain import build_report, load_question, prediction_schema
@@ -31,7 +34,7 @@ def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def create_job(question) -> str:
+def create_job(question: MetaculusQuestion) -> str:
     job_id = str(uuid4())
     path = job_path(job_id)
     path.mkdir(parents=True)
@@ -41,7 +44,7 @@ def create_job(question) -> str:
     return job_id
 
 
-def read_question(job_id: str):
+def read_question(job_id: str) -> MetaculusQuestion:
     return load_question(read_json(job_path(job_id) / "question.json"))
 
 
@@ -50,7 +53,7 @@ def get_job(job_id: str) -> dict:
     data = question.model_dump(mode="json", serialize_as_any=True)
 
     # The raw API response duplicates the question and can contain community forecasts.
-    def clean(value):
+    def clean(value: Any) -> Any:
         if isinstance(value, dict):
             return {
                 k: clean(v)
@@ -90,6 +93,6 @@ def save_forecast(job_id: str, prediction: dict, research: str, rationale: str) 
     }
 
 
-def read_report(job_id: str):
+def read_report(job_id: str) -> ForecastReport:
     data = read_json(job_path(job_id) / "forecast.json")
     return build_report(read_question(job_id), **data)

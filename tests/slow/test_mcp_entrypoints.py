@@ -11,7 +11,7 @@ from metac_bot.infrastructure.paths import ROOT
 
 
 class McpEntrypointTests(unittest.IsolatedAsyncioTestCase):
-    async def test_existing_mcp_launch_commands_expose_tools(self):
+    async def test_existing_mcp_launch_commands_expose_tools(self) -> None:
         servers = (
             (
                 "metac_bot.mcp_server",
@@ -33,7 +33,7 @@ class McpEntrypointTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        async def list_tools(module):
+        async def list_tools(module: str) -> set[str]:
             params = StdioServerParameters(
                 command=sys.executable, args=["-m", module], cwd=ROOT
             )

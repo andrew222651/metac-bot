@@ -14,7 +14,7 @@ from metac_bot.infrastructure.config import OneOffConfig
 
 
 class OneOffCliTests(unittest.TestCase):
-    def test_parse_multiple_choice_and_model(self):
+    def test_parse_multiple_choice_and_model(self) -> None:
         config = parse_args(
             [
                 "forecast",
@@ -38,14 +38,14 @@ class OneOffCliTests(unittest.TestCase):
         self.assertTrue(config.dry_run)
         self.assertFalse(config.single_agent)
 
-    def test_binary_question_requires_no_options(self):
+    def test_binary_question_requires_no_options(self) -> None:
         config = parse_args(["forecast", "Will it happen?", "--single-agent"])
         self.assertIsInstance(config, OneOffConfig)
         assert isinstance(config, OneOffConfig)
         self.assertEqual(config.options, ())
         self.assertTrue(config.single_agent)
 
-    def test_one_off_exposes_ensemble_configuration(self):
+    def test_one_off_exposes_ensemble_configuration(self) -> None:
         config = parse_args(
             [
                 "forecast",
@@ -85,7 +85,7 @@ class OneOffCliTests(unittest.TestCase):
         self.assertEqual(config.ensemble_review_timeout, 801)
         self.assertEqual(config.ensemble_decision_timeout, 901)
 
-    def test_rejects_invalid_or_publishing_options(self):
+    def test_rejects_invalid_or_publishing_options(self) -> None:
         cases = [
             ["forecast", " "],
             ["forecast", "Question", "--option", "only"],
@@ -101,7 +101,7 @@ class OneOffCliTests(unittest.TestCase):
 
 
 class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
-    async def test_one_off_uses_ensemble_without_metaculus_or_publishing(self):
+    async def test_one_off_uses_ensemble_without_metaculus_or_publishing(self) -> None:
         config = OneOffConfig(
             question="Which party?", options=("PP", "PSOE"), model="provider/model"
         )
@@ -146,7 +146,7 @@ class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("PP: 70.0%", output.getvalue())
             self.assertIn("Research", output.getvalue())
 
-    async def test_one_off_single_agent_saves_without_publishing(self):
+    async def test_one_off_single_agent_saves_without_publishing(self) -> None:
         config = OneOffConfig(question="Will it happen?", single_agent=True)
         client = AsyncMock()
         client.__aenter__.return_value = client
@@ -156,7 +156,7 @@ class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
             patch.object(jobs, "JOBS", Path(directory)),
         ):
 
-            async def record(*_args):
+            async def record(*_args: object) -> None:
                 job_id = next(Path(directory).iterdir()).name
                 jobs.save_forecast(
                     job_id, {"probability": 0.6}, "Research", "Rationale"

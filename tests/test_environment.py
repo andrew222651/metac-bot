@@ -16,7 +16,7 @@ from metac_bot.infrastructure.environment import (
 
 
 class EnvironmentTests(unittest.TestCase):
-    def test_environment_settings_and_cli_precedence(self):
+    def test_environment_settings_and_cli_precedence(self) -> None:
         env = {
             "OPENCODE_MODEL": "openrouter/env-model#low",
             "METAC_BOT_SESSION_TIMEOUT": "321",
@@ -73,7 +73,7 @@ class EnvironmentTests(unittest.TestCase):
                 {"skeptic": "provider/cli-skeptic", "generalist": "provider/base"},
             )
 
-    def test_help_lists_every_registered_name_without_showing_secrets(self):
+    def test_help_lists_every_registered_name_without_showing_secrets(self) -> None:
         root = Path(__file__).resolve().parents[1]
         env = {**os.environ, "OPENROUTER_API_KEY": "never-print-this-test-secret"}
         for args in (["--help"], ["forecast", "--help"]):
@@ -93,7 +93,9 @@ class EnvironmentTests(unittest.TestCase):
                 for name in EnvironmentSettings.model_fields:
                     self.assertIn(name, result.stdout)
 
-    def test_generated_template_covers_settings_without_using_environment_values(self):
+    def test_generated_template_covers_settings_without_using_environment_values(
+        self,
+    ) -> None:
         with patch.dict(
             os.environ,
             {
@@ -120,7 +122,7 @@ class EnvironmentTests(unittest.TestCase):
         self.assertIn("# METAC_BOT_SINGLE_AGENT=false", template)
         self.assertIn("# METACULUS_TOKEN=", template)
 
-    def test_generate_env_command_prints_template_and_exits(self):
+    def test_generate_env_command_prints_template_and_exits(self) -> None:
         root = Path(__file__).resolve().parents[1]
         result = subprocess.run(
             [sys.executable, "-m", "metac_bot", "generate-env"],
@@ -138,21 +140,23 @@ class EnvironmentTests(unittest.TestCase):
         self.assertEqual(result.stdout, environment_template())
         self.assertNotIn("never-print-this-test-secret", result.stdout + result.stderr)
 
-    def test_explicit_cli_value_overrides_an_invalid_environment_value(self):
+    def test_explicit_cli_value_overrides_an_invalid_environment_value(self) -> None:
         with patch.dict(
             os.environ, {"METAC_BOT_SESSION_TIMEOUT": "invalid"}, clear=True
         ):
             config = parse_args(["forecast", "Question?", "--timeout", "120"])
             self.assertEqual(config.timeout, 120)
 
-    def test_empty_ensemble_model_option_clears_invalid_environment_mapping(self):
+    def test_empty_ensemble_model_option_clears_invalid_environment_mapping(
+        self,
+    ) -> None:
         with patch.dict(
             os.environ, {"METAC_BOT_ENSEMBLE_MODELS": "not-json"}, clear=True
         ):
             config = parse_args(["forecast", "Question?", "--empty-ensemble-model"])
             self.assertEqual(config.ensemble_models, {})
 
-    def test_settings_repr_hides_secret_values(self):
+    def test_settings_repr_hides_secret_values(self) -> None:
         with patch.dict(
             os.environ,
             {"OPENROUTER_API_KEY": "never-print-this-test-secret"},
