@@ -31,7 +31,10 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
 
             client.wait.side_effect = record_then_timeout
             result = await main.forecast_question(
-                client, None, question, RunConfig(single_agent=True, dry_run=True, timeout=10)
+                client,
+                None,
+                question,
+                RunConfig(single_agent=True, dry_run=True, timeout=10),
             )
             self.assertIsInstance(result, BinaryReport)
             job_id = next(Path(directory).iterdir()).name

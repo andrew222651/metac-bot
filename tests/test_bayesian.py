@@ -27,7 +27,10 @@ from metac_bot.forecasting.implementation.bayesian_jobs import (
     read_stage,
     record_stage,
 )
-from metac_bot.forecasting.implementation.ensemble import EnsembleRunner, EnsembleSettings
+from metac_bot.forecasting.implementation.ensemble import (
+    EnsembleRunner,
+    EnsembleSettings,
+)
 from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
 from metac_bot.forecasting.strategy.roles import ROLES
 from metac_bot.forecasting.strategy.workflow import run_ensemble
@@ -390,7 +393,10 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertTrue(all(stage["status"] == "complete" for stage in recovered))
             self.assertTrue(
-                all("session time budget is 10 seconds" in prompt for prompt in client.prompts)
+                all(
+                    "session time budget is 10 seconds" in prompt
+                    for prompt in client.prompts
+                )
             )
 
     async def test_timeout_without_valid_stage_does_not_count(self) -> None:
@@ -410,7 +416,8 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                     if malformed:
                         stage_id = client.sessions[session]["stage_id"]
                         jobs.write_json(
-                            jobs.job_path(stage_id) / "stage_result.json", {"posterior": {}}
+                            jobs.job_path(stage_id) / "stage_result.json",
+                            {"posterior": {}},
                         )
                     raise TimeoutError("session expired")
 

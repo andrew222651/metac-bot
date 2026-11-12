@@ -23,6 +23,7 @@ if [[ "$*" == 'debug paths state' ]]; then printf '/test-state\\n'; fi
                 "proot-distro": """#!/bin/bash
 printf 'proot-distro %s\\n' "$*" >> "$FAKE_LOG"
 source /dev/fd/3
+[[ "${FRED_API_KEY:-}" == 'fred-secret' ]] || exit 2
 printf 'registration=%s\\n' "${OPENCODE_SERVICE_FILE:-}" >> "$FAKE_LOG"
 if [[ "${OPENROUTER_API_KEY:-}" == *'$('* ]]; then printf 'secret-forwarded\\n' >> "$FAKE_LOG"; fi
 """,
@@ -36,6 +37,7 @@ if [[ "${OPENROUTER_API_KEY:-}" == *'$('* ]]; then printf 'secret-forwarded\\n' 
                 "FAKE_LOG": str(log),
                 "TERMUX_VERSION": "0.118",
                 "OPENROUTER_API_KEY": f"$(touch {base / 'injected'})",
+                "FRED_API_KEY": "fred-secret",
             }
             for name in (
                 "PD_CONTAINER",

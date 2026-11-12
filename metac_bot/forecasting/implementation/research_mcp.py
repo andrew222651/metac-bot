@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-from ...infrastructure import research
+from ...infrastructure import market_data, research
 from ...infrastructure.paths import ROOT
 from ..strategy.research import RESEARCH_INSTRUCTIONS
 
@@ -57,6 +57,38 @@ async def exa_search(
     characters per page; synthesize the evidence yourself in OpenCode.
     """
     return await research.exa_search(query, num_results, include_domains)
+
+
+@mcp.tool()
+async def yahoo_financial_series(
+    symbol: Annotated[str, Field(min_length=1, max_length=40)],
+) -> dict:
+    """Retrieve up to a year of dated daily Yahoo Finance closes for a known ticker."""
+    return await market_data.yahoo_series(symbol)
+
+
+@mcp.tool()
+async def fred_financial_series(
+    series_id: Annotated[str, Field(min_length=1, max_length=40)],
+) -> dict:
+    """Retrieve recent FRED observations for a known series ID; requires FRED_API_KEY."""
+    return await market_data.fred_series(series_id)
+
+
+@mcp.tool()
+async def prediction_market_search(
+    query: Annotated[str, Field(min_length=1, max_length=500)],
+) -> dict:
+    """Find unverified candidates across four markets; Kalshi scans only part of its catalogue."""
+    return await market_data.prediction_markets(query)
+
+
+@mcp.tool()
+async def kalshi_market(
+    ticker: Annotated[str, Field(min_length=1, max_length=100)],
+) -> dict:
+    """Retrieve the rules and prices of a known Kalshi market ticker."""
+    return await market_data.kalshi_market(ticker)
 
 
 if __name__ == "__main__":

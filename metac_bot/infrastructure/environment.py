@@ -55,6 +55,9 @@ class ConnectionSettings(BaseSettings):
     PERPLEXITY_API_KEY: SecretStr | None = Field(
         None, description="Perplexity API key for the research MCP server."
     )
+    FRED_API_KEY: SecretStr | None = Field(
+        None, description="FRED API key for economic time-series research."
+    )
     OPENCODE_SEARCH_PROVIDER: str | None = Field(
         None,
         description="OpenCode search-provider override, e.g. random, exa, firecrawl, parallel, tavily, or tinyfish.",

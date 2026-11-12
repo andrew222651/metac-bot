@@ -20,8 +20,17 @@ description: Research forecasting questions using native web tools, AskNews, Per
      source domains. Start with five results; use up to ten for broader coverage.
    - `research.asknews_research`, depth `news`: recent and historical news summaries.
      Depth `low`, `medium`, or `high`: AskNews' original deep-research presets.
-   - `research.perplexity_research`: synthesized research with sources. `fast` is
-     the starting point; use higher effort when a complex evidence gap warrants it.
+    - `research.perplexity_research`: synthesized research with sources. `fast` is
+      the starting point; use higher effort when a complex evidence gap warrants it.
+    - `research.yahoo_financial_series`: dated daily prices for a known Yahoo ticker;
+      `research.fred_financial_series`: recent FRED observations for a known series ID
+      when `FRED_API_KEY` is configured. Confirm identifiers and units at the source.
+    - `research.prediction_market_search`: candidate markets from Manifold, Polymarket,
+      PredictIt, and a bounded partial scan of Kalshi. `research.kalshi_market`
+      retrieves a known Kalshi ticker, including one found elsewhere. Compare each
+      contract's resolution rules and dates before
+      using prices. Bid, ask and last trade are not interchangeable, and a market
+      price is not necessarily a calibrated probability.
 4. Read the most relevant sources, check dates and units, deduplicate repeated
    reporting, and actively search for contrary evidence. Follow up on gaps rather
    than treating a provider-generated answer as authoritative. AskNews and

@@ -116,9 +116,10 @@ class OpenCode:
                 ) from exc
         except BaseException:
             try:
-                await self.request(
-                    "POST", f"/api/session/{session_id}/interrupt", json={}
-                )
+                async with asyncio.timeout(5):
+                    await self.request(
+                        "POST", f"/api/session/{session_id}/interrupt", json={}
+                    )
             except Exception:
                 pass
             raise

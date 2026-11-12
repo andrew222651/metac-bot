@@ -48,11 +48,24 @@ CLI options override matching environment variables. The private server normally
 
 ## Configure secrets and variables in GitHub
 
+For live runs, questions with known close times are processed earliest first. The
+runner reserves time for publication, shortens agent budgets when needed, and
+skips questions too close to closing. It never bypasses ensemble review or
+convergence. Dry runs are not close-limited.
+
+Agents can retrieve Yahoo Finance daily closes, FRED series, and prediction-market
+candidates as research. FRED requires `FRED_API_KEY`; the other data endpoints do
+not require credentials. Kalshi search scans only part of its catalogue; exact
+lookup requires a known market ticker. Agents
+must check market resolution rules, timestamps, and liquidity rather than treating
+a search hit as an equivalent forecast. Data sources can be unavailable or stale.
+
 In your repository, open **Settings → Secrets and variables → Actions → Secrets** and add:
 
 - `METACULUS_TOKEN` for the Metaculus bot account.
 - At least one model provider key: `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`.
 - A key for the search provider you use, such as `EXA_API_KEY` or `TAVILY_API_KEY`. Optional AskNews and Perplexity credentials and other search keys are listed in the generated environment template and CLI help.
+- Optionally, `FRED_API_KEY` for FRED economic observations.
 
 For manually started workflows, the model, search provider, session timeout, and ensemble concurrency inputs override the corresponding repository variables. A blank input, or `configured` for search, falls back to the variable. Scheduled runs have no inputs and use the variables directly. If a variable is not set, the workflow uses the fallback below. Credentials always come from repository secrets, not dispatch inputs.
 

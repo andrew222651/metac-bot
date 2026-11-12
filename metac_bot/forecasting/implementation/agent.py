@@ -1,6 +1,7 @@
 """Common OpenCode session lifecycle for all forecasting agents."""
 
 from datetime import datetime, timezone
+import asyncio
 from typing import Callable
 
 from ...infrastructure.opencode import OpenCode
@@ -24,15 +25,25 @@ async def run_agent(
     else:
         session_id = await opencode.create_session(ROOT, title, model)
     on_session(session_id)
-    await opencode.prompt(
-        session_id,
-        (
-            f"{prompt}\nToday is {datetime.now(timezone.utc).isoformat()}.\n\n"
-            f"Your session time budget is {timeout:g} seconds. Prioritize completing "
-            "and recording a valid result within this budget; limit research and "
-            "calculations as needed and report remaining limitations honestly.\n\n"
-            + SUPERFORECASTING_PRINCIPLES
-        ),
-    )
+    try:
+        await opencode.prompt(
+            session_id,
+            (
+                f"{prompt}\nToday is {datetime.now(timezone.utc).isoformat()}.\n\n"
+                f"Your session time budget is {timeout:g} seconds. Prioritize completing "
+                "and recording a valid result within this budget; limit research and "
+                "calculations as needed and report remaining limitations honestly.\n\n"
+                + SUPERFORECASTING_PRINCIPLES
+            ),
+        )
+    except asyncio.CancelledError:
+        try:
+            async with asyncio.timeout(5):
+                await opencode.request(
+                    "POST", f"/api/session/{session_id}/interrupt", json={}
+                )
+        except Exception:
+            pass
+        raise
     await opencode.wait(session_id, timeout)
     return session_id

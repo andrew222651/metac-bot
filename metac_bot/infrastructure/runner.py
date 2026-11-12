@@ -24,6 +24,13 @@ from ..forecasting.implementation.jobs import (
 from ..forecasting.strategy.prompts import forecast_prompt
 from ..forecasting.strategy.workflow import run_ensemble, uses_ensemble
 from .config import OneOffConfig, RunConfig
+from .deadlines import (
+    MIN_FORECAST_BUDGET,
+    forecast_budget,
+    is_closed,
+    remaining_seconds,
+    stage_timeout_cap,
+)
 from .opencode import OpenCode
 from .opencode_service import connect_for_run
 from .runtime import (
@@ -55,6 +62,13 @@ async def select_questions(
                 continue
             questions[(question.id_of_post, question.id_of_question)] = question
     selected = list(questions.values())
+    if not args.dry_run:
+
+        def close_sort_key(question: MetaculusQuestion) -> float:
+            remaining = remaining_seconds(question)
+            return remaining if remaining is not None else float("inf")
+
+        selected.sort(key=close_sort_key)
     if args.limit:
         selected = selected[: args.limit]
     return selected
@@ -67,79 +81,36 @@ async def forecast_question(
     args: RunConfig,
 ) -> ForecastReport | Exception:
     """Run one question independently; return either its report or its error."""
+    budget = forecast_budget(question, args)
+    if not args.dry_run and is_closed(question):
+        return RuntimeError(f"Question {question.page_url} is already closed")
+    if budget is not None and budget < MIN_FORECAST_BUDGET:
+        return RuntimeError(
+            f"Question {question.page_url} is too close to closing to forecast safely"
+        )
     job_id = create_job(question)
     session_id = None
     try:
-        if uses_ensemble(question, single_agent=args.single_agent):
-            logger.info("Bayesian ensemble for %s: job=%s", question.page_url, job_id)
-            result = await run_ensemble(
-                opencode,
-                question,
-                job_id,
-                model=args.model,
-                timeout=args.timeout,
-                concurrency=args.ensemble_concurrency,
-                min_members=args.ensemble_min_members,
-                review_rounds=args.ensemble_review_rounds,
-                tolerance=args.ensemble_tolerance,
-                member_models=args.ensemble_models,
-                adjudicator_model=args.ensemble_adjudicator_model,
-                stage_timeouts={
-                    "proposal": args.ensemble_proposal_timeout,
-                    "review": args.ensemble_review_timeout,
-                    "decision": args.ensemble_decision_timeout,
-                },
-            )
-            save_forecast(job_id, **result)
-        else:
-
-            def record_session(value: str) -> None:
-                nonlocal session_id
-                session_id = value
-                write_json(job_path(job_id) / "session.json", {"session_id": value})
-                logger.info(
-                    "Question %s: job=%s session=%s", question.page_url, job_id, value
-                )
-
-            try:
-                await run_agent(
-                    opencode,
-                    title=f"Forecast: {question.question_text[:100]}",
-                    model=args.model,
-                    timeout=args.timeout,
-                    on_session=record_session,
-                    prompt=forecast_prompt(job_id, one_off=isinstance(args, OneOffConfig)),
-                )
-            except TimeoutError as timeout_error:
-                if session_id is None:
-                    raise
-                try:
-                    read_report(job_id)
-                except Exception:
-                    raise timeout_error from None
-                write_json(
-                    job_path(job_id) / "session.json",
-                    {"session_id": session_id, "timeout_recovered": True},
-                )
-                logger.warning(
-                    "Using recorded forecast after session %s timed out", session_id
-                )
-        if not (job_path(job_id) / "forecast.json").exists():
-            messages = await opencode.messages(cast(str, session_id))
-            write_json(job_path(job_id) / "messages.json", messages)
-            raise RuntimeError(
-                f"OpenCode did not record a forecast; inspect session {session_id}"
-            )
+        async with asyncio.timeout(budget):
+            await _produce_forecast(opencode, question, args, job_id, budget)
         report = read_report(job_id)
         write_json(
             job_path(job_id) / "report.json",
             report.model_dump(mode="json", serialize_as_any=True),
         )
         if not args.dry_run:
+            remaining = remaining_seconds(question)
+            if is_closed(question) or (remaining is not None and remaining <= 0):
+                raise RuntimeError("Question closed before publication")
             await report.publish_report_to_metaculus(metaculus)
         write_json(job_path(job_id) / "result.json", {"published": not args.dry_run})
         return report
     except Exception as exc:
+        session_path = job_path(job_id) / "session.json"
+        if session_path.exists():
+            from ..forecasting.implementation.jobs import read_json
+
+            session_id = read_json(session_path).get("session_id")
         logger.exception(
             "Forecast failed for %s (session %s)", question.page_url, session_id
         )
@@ -148,6 +119,77 @@ async def forecast_question(
             {"error": str(exc), "session_id": session_id},
         )
         return exc
+
+
+async def _produce_forecast(
+    opencode: OpenCode,
+    question: MetaculusQuestion,
+    args: RunConfig,
+    job_id: str,
+    budget: float | None,
+) -> None:
+    session_id = None
+    cap = stage_timeout_cap(budget, args) if budget is not None else float("inf")
+    if uses_ensemble(question, single_agent=args.single_agent):
+        logger.info("Bayesian ensemble for %s: job=%s", question.page_url, job_id)
+        result = await run_ensemble(
+            opencode,
+            question,
+            job_id,
+            model=args.model,
+            timeout=min(args.timeout, cap),
+            concurrency=args.ensemble_concurrency,
+            min_members=args.ensemble_min_members,
+            review_rounds=args.ensemble_review_rounds,
+            tolerance=args.ensemble_tolerance,
+            member_models=args.ensemble_models,
+            adjudicator_model=args.ensemble_adjudicator_model,
+            stage_timeouts={
+                "proposal": min(args.ensemble_proposal_timeout or args.timeout, cap),
+                "review": min(args.ensemble_review_timeout or args.timeout, cap),
+                "decision": args.ensemble_decision_timeout,
+            },
+        )
+        save_forecast(job_id, **result)
+    else:
+
+        def record_session(value: str) -> None:
+            nonlocal session_id
+            session_id = value
+            write_json(job_path(job_id) / "session.json", {"session_id": value})
+            logger.info(
+                "Question %s: job=%s session=%s", question.page_url, job_id, value
+            )
+
+        try:
+            await run_agent(
+                opencode,
+                title=f"Forecast: {question.question_text[:100]}",
+                model=args.model,
+                timeout=min(args.timeout, cap),
+                on_session=record_session,
+                prompt=forecast_prompt(job_id, one_off=isinstance(args, OneOffConfig)),
+            )
+        except TimeoutError as timeout_error:
+            if session_id is None:
+                raise
+            try:
+                read_report(job_id)
+            except Exception:
+                raise timeout_error from None
+            write_json(
+                job_path(job_id) / "session.json",
+                {"session_id": session_id, "timeout_recovered": True},
+            )
+            logger.warning(
+                "Using recorded forecast after session %s timed out", session_id
+            )
+    if not (job_path(job_id) / "forecast.json").exists():
+        messages = await opencode.messages(cast(str, session_id))
+        write_json(job_path(job_id) / "messages.json", messages)
+        raise RuntimeError(
+            f"OpenCode did not record a forecast; inspect session {session_id}"
+        )
 
 
 async def run(args: RunConfig) -> int:

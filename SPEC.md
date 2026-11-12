@@ -45,6 +45,16 @@ Agents can use these research tools, subject to configuration and availability:
 - **AskNews** (`research.asknews_research`): news summaries and deep research.
 - **Perplexity** (`research.perplexity_research`): search-grounded research and
   synthesis with sources.
+- **Yahoo Finance** (`research.yahoo_financial_series`): dated daily prices for an
+  agent-selected ticker. The latest bar may be incomplete, delayed or revised.
+- **FRED** (`research.fred_financial_series`): recent economic observations for an
+  agent-selected series ID, when `FRED_API_KEY` is configured. Observation dates are
+  not release dates and current observations may have been revised.
+- **Prediction markets** (`research.prediction_market_search`): candidate results
+  from Manifold, Polymarket, PredictIt, and a bounded partial Kalshi catalogue scan;
+  `research.kalshi_market` retrieves a
+  known Kalshi ticker. These are leads, not automatically matched forecasts; agents
+  compare resolution rules, time horizons, prices and liquidity before using them.
 
 Agents select tools according to the question rather than calling every service.
 Provider-generated summaries are leads, not authority: important claims
@@ -69,8 +79,14 @@ incomplete research and other limitations honestly. A recorded result can be
 used if the session subsequently times out; without one, that session fails.
 The ensemble requires a configured quorum of proposals and reviews and must
 converge.
-The session limit is not a deadline for the entire ensemble: queueing, multiple
-rounds, service calls, and interruption add time beyond an individual session.
+For publishing runs, questions are processed in close-time order, with unknown close
+times last. The runner reserves 30 seconds for publication, skips a question when less
+than 60 seconds remains for forecasting, and imposes a wall-clock deadline on the
+entire forecast. Session time limits are capped to leave time for one proposal and
+review wave. Quorum and convergence remain mandatory; a timeout does not publish an
+unreviewed forecast. The runner checks the cached close time and state before publishing;
+it does not refresh the question, so a platform-side early close may still reject it.
+Dry runs and questions without a known close retain the normal session limits.
 
 
 ## Ensemble aggregation and review
