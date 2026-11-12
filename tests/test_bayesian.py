@@ -34,6 +34,7 @@ from metac_bot.forecasting.implementation.ensemble import (
 from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
 from metac_bot.forecasting.strategy.roles import ROLES
 from metac_bot.forecasting.strategy.workflow import run_ensemble
+from metac_bot.infrastructure.opencode import InputRequiredError
 
 
 def proposal(url: str = "https://example.org/a") -> dict:
@@ -366,6 +367,71 @@ class FakeOpenCode:
 
 
 class EnsembleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_saved_review_with_input_request_is_used(self) -> None:
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+        ):
+            question = BinaryQuestion(question_text="Synthetic")
+            job_id = jobs.create_job(question)
+            client = FakeOpenCode()
+            original_wait = client.wait
+
+            async def review_with_input(session: str, timeout: float) -> None:
+                title = client.sessions[session]["title"]
+                if title in {
+                    "Bayesian review: skeptic",
+                    "Bayesian review: economic-modeler",
+                    "Bayesian review: causal-modeler",
+                }:
+                    raise RuntimeError("Review failed")
+                await original_wait(session, timeout)
+                if title == "Bayesian review: base-rate":
+                    raise InputRequiredError("needs input")
+
+            with patch.object(client, "wait", side_effect=review_with_input):
+                result = await run_ensemble(client, question, job_id)
+            self.assertAlmostEqual(result["prediction"]["probability"], 1 / 3)
+            artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+            recovered = [s for s in artifact["stages"] if s.get("input_recovered")]
+            self.assertEqual(len(recovered), 1)
+            self.assertEqual(recovered[0]["label"], "base-rate")
+            self.assertEqual(recovered[0]["status"], "complete")
+            self.assertEqual(len(artifact["rounds"][1]["review_stages"]), 3)
+            self.assertTrue(artifact["converged"])
+
+    async def test_input_without_valid_record_fails(self) -> None:
+        for malformed in (False, True):
+            with (
+                self.subTest(malformed=malformed),
+                TemporaryDirectory() as directory,
+                patch.object(jobs, "JOBS", Path(directory)),
+            ):
+                question = BinaryQuestion(question_text="Synthetic")
+                client = FakeOpenCode()
+                runner = EnsembleRunner(
+                    client, question, jobs.create_job(question), EnsembleSettings()
+                )
+
+                async def request_input(session: str, seconds: float) -> None:
+                    if malformed:
+                        stage_id = client.sessions[session]["stage_id"]
+                        jobs.write_json(
+                            jobs.job_path(stage_id) / "stage_result.json",
+                            {"posterior": {}},
+                        )
+                    raise InputRequiredError("needs input")
+
+                with patch.object(client, "wait", side_effect=request_input):
+                    result = await runner.run_stage(
+                        "proposal", "generalist", {"role": "generalist"}
+                    )
+                self.assertIsNone(result)
+                self.assertEqual(runner.artifacts["stages"][0]["status"], "failed")
+                self.assertIn(
+                    "InputRequiredError", runner.artifacts["stages"][0]["error"]
+                )
+
     async def test_recorded_stages_survive_session_timeout(self) -> None:
         with (
             TemporaryDirectory() as directory,
@@ -644,29 +710,64 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("proposals", context)
                 self.assertNotIn("prior", context)
 
-    async def test_quorum_failure_never_creates_forecast(self) -> None:
+    async def test_one_successful_proposal_and_review_is_enough(self) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
         ):
             question = BinaryQuestion(question_text="Synthetic")
             job_id = jobs.create_job(question)
-            with self.assertRaisesRegex(RuntimeError, "Only 2 Bayesian proposals"):
+            client = FakeOpenCode(set(ROLES) - {"generalist"})
+            result = await run_ensemble(client, question, job_id)
+            self.assertAlmostEqual(result["prediction"]["probability"], 1 / 3)
+            artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+            self.assertEqual(artifact["weights"], {"generalist": 1.0})
+            self.assertTrue(artifact["converged"])
+            self.assertIn("1 of 6 proposals completed", result["rationale"])
+
+    async def test_one_successful_review_is_enough(self) -> None:
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+        ):
+            question = BinaryQuestion(question_text="Synthetic")
+            job_id = jobs.create_job(question)
+            client = FakeOpenCode()
+            original_wait = client.wait
+
+            async def fail_other_reviews(session: str, timeout: float) -> None:
+                title = client.sessions[session]["title"]
+                if title.startswith("Bayesian review:") and not title.endswith(
+                    "generalist"
+                ):
+                    raise RuntimeError("Review failed")
+                await original_wait(session, timeout)
+
+            with patch.object(client, "wait", side_effect=fail_other_reviews):
+                result = await run_ensemble(client, question, job_id)
+            artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+            self.assertTrue(artifact["converged"])
+            self.assertEqual(len(artifact["rounds"][1]["review_stages"]), 1)
+            self.assertIn("5 reviewers did not complete", result["rationale"])
+
+    async def test_all_proposals_fail_without_forecast(self) -> None:
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+        ):
+            question = BinaryQuestion(question_text="Synthetic")
+            job_id = jobs.create_job(question)
+            with self.assertRaisesRegex(
+                RuntimeError, "No Bayesian proposals succeeded"
+            ):
                 await run_ensemble(
-                    FakeOpenCode(
-                        {
-                            "generalist",
-                            "skeptic",
-                            "economic-modeler",
-                            "causal-modeler",
-                        }
-                    ),
+                    FakeOpenCode(ROLES),
                     question,
                     job_id,
                 )
             self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
 
-    async def test_any_role_can_fail_proposal_with_quorum(self) -> None:
+    async def test_any_role_can_fail_proposal(self) -> None:
         for role in ROLES:
             with (
                 self.subTest(role=role),
@@ -682,7 +783,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(len(artifact["weights"]), len(ROLES) - 1)
                 self.assertTrue(artifact["converged"])
 
-    async def test_any_role_can_fail_review_with_quorum(self) -> None:
+    async def test_any_role_can_fail_review(self) -> None:
         for role in ROLES:
             with (
                 self.subTest(role=role),
@@ -721,7 +822,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertTrue(artifact["converged"])
 
-    async def test_review_quorum_failure_prevents_result(self) -> None:
+    async def test_all_reviews_fail_uses_unreviewed_pool(self) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -737,9 +838,51 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 await original_wait(session, timeout)
 
             with patch.object(client, "wait", side_effect=fail_reviews):
-                with self.assertRaisesRegex(RuntimeError, "Bayesian reviews succeeded"):
-                    await run_ensemble(client, question, job_id)
-            self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
+                result = await run_ensemble(client, question, job_id)
+            self.assertAlmostEqual(result["prediction"]["probability"], 1 / 3)
+            artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+            self.assertFalse(artifact["converged"])
+            self.assertTrue(artifact["reviews_unavailable"])
+            self.assertIsNone(artifact["rounds"][1]["all_reviewers_accept_previous"])
+            self.assertIn("No reviewers completed the final round", result["rationale"])
+            self.assertIn("without establishing convergence", result["rationale"])
+
+    async def test_later_round_without_reviews_retains_earlier_revision(self) -> None:
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+        ):
+            question = BinaryQuestion(question_text="Synthetic")
+            job_id = jobs.create_job(question)
+            client = FakeOpenCode()
+            original_wait = client.wait
+
+            async def revise_then_fail(session: str, timeout: float) -> None:
+                if "review:" not in client.sessions[session]["title"]:
+                    await original_wait(session, timeout)
+                    return
+                stage_id = client.sessions[session]["stage_id"]
+                context = get_stage(stage_id)["context"]
+                if context["round"] == 2:
+                    raise RuntimeError("Review failed")
+                record_stage(
+                    stage_id,
+                    {
+                        "accepts_current": False,
+                        "posterior": {"probability": 0.6},
+                        "critique": "Revise",
+                        "reasoning": "Updated",
+                        "limitations": "Uncertain",
+                    },
+                )
+
+            with patch.object(client, "wait", side_effect=revise_then_fail):
+                result = await run_ensemble(client, question, job_id, review_rounds=2)
+            self.assertAlmostEqual(result["prediction"]["probability"], 0.6)
+            artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+            self.assertFalse(artifact["converged"])
+            self.assertTrue(artifact["reviews_unavailable"])
+            self.assertIn("earlier completed reviews", result["rationale"])
 
     async def test_stable_posterior_without_acceptance_fails_closed(self) -> None:
         with (

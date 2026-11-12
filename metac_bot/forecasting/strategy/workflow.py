@@ -1,7 +1,7 @@
 """The forecasting strategy: independent posteriors, pooling, and review."""
 
 import asyncio
-from typing import Any, Literal
+from typing import Any
 import json
 
 from forecasting_tools import MetaculusQuestion
@@ -15,42 +15,24 @@ def uses_ensemble(question: MetaculusQuestion, *, single_agent: bool) -> bool:
     return not single_agent
 
 
-def require_quorum(
-    runner: EnsembleRunner,
-    stages: list[dict | None],
-    stage: Literal["proposal", "review"],
-    round_number: int | None = None,
-) -> list[dict]:
-    completed = [result for result in stages if result is not None]
-    if len(completed) < runner.settings.min_members:
-        description = (
-            "proposals"
-            if stage == "proposal"
-            else f"reviews succeeded in round {round_number}"
-        )
-        if stage == "proposal":
-            description += " succeeded"
-        raise RuntimeError(
-            f"Only {len(completed)} Bayesian {description}; need {runner.settings.min_members}. "
-            f"{runner.describe_failures(stage, round_number=round_number)}"
-        )
-    return completed
-
-
 async def run_workflow(runner: EnsembleRunner) -> dict:
     """Pool independent Bayesian judgments, then review and revise them."""
-    proposals = require_quorum(
-        runner,
-        await asyncio.gather(
+    proposals = [
+        result
+        for result in await asyncio.gather(
             *(
                 runner.run_stage(
                     "proposal", role, {"role": role, "instructions": instructions}
                 )
                 for role, instructions in ROLES.items()
             )
-        ),
-        "proposal",
-    )
+        )
+        if result is not None
+    ]
+    if not proposals:
+        raise RuntimeError(
+            f"No Bayesian proposals succeeded; {runner.describe_failures('proposal')}"
+        )
     weights = [1 / len(proposals)] * len(proposals)
     posteriors = {item["role"]: item["result"]["posterior"] for item in proposals}
     current = pool_posteriors(runner.question, list(posteriors.values()), weights)
@@ -62,6 +44,7 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
 
     converged = False
     previous_reviews: list[dict] = []
+    reviews_unavailable = False
     for round_number in range(1, runner.settings.review_rounds + 1):
         context = {
             "round": round_number,
@@ -71,17 +54,16 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
             "current": current.prediction(),
             "previous_reviews": previous_reviews,
         }
-        reviews = require_quorum(
-            runner,
-            await asyncio.gather(
+        reviews = [
+            result
+            for result in await asyncio.gather(
                 *(
                     runner.run_stage("review", proposal["role"], context)
                     for proposal in proposals
                 )
-            ),
-            "review",
-            round_number,
-        )
+            )
+            if result is not None
+        ]
         for review in reviews:
             posteriors[review["role"]] = review["result"]["posterior"]
         previous_reviews = reviews
@@ -90,8 +72,13 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
             current, updated, error=min(0.001, runner.settings.tolerance / 10)
         )
         current = updated
-        accepted = all(review["result"]["accepts_current"] for review in reviews)
-        converged = accepted and delta <= runner.settings.tolerance
+        accepted = (
+            all(review["result"]["accepts_current"] for review in reviews)
+            if reviews
+            else None
+        )
+        converged = accepted is True and delta <= runner.settings.tolerance
+        reviews_unavailable = not reviews
         runner.artifacts["rounds"].append(
             {
                 "round": round_number,
@@ -103,29 +90,39 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
             }
         )
         runner.persist()
-        if converged:
+        if converged or reviews_unavailable:
             break
 
     posterior = current.prediction()
     prediction = publication_prediction(current)
     runner.artifacts.update(
         converged=converged,
+        reviews_unavailable=reviews_unavailable,
         posterior=posterior,
         published_prediction=prediction,
     )
     runner.persist()
-    if not converged:
+    if not converged and not reviews_unavailable:
         raise RuntimeError(
             f"Bayesian ensemble did not converge within {runner.settings.review_rounds} review rounds; no forecast published"
         )
     research = "\n\n".join(
         f"### {item['role']}\n{item['result']['research']}" for item in proposals
     )
+    review_summary = (
+        f"All {len(previous_reviews)} completed reviewers accepted the consensus and "
+        f"the change met the tolerance; {len(proposals) - len(previous_reviews)} "
+        "reviewers did not complete the final round."
+        if converged
+        else "No reviewers completed the final round. The latest available pooled "
+        "judgments are reported without establishing convergence; earlier completed "
+        "reviews, if any, are retained."
+    )
     rationale = (
         "Equal-weight linear pooling of agents' Bayesian judgments; shared evidence "
         "is not treated as independent, and the pool is not a verified Bayesian posterior. "
         "Quantiles use piecewise-linear CDF interpolation and the documented tail assumptions. "
-        "All completed reviewers accepted the consensus and the change met the tolerance.\n\n"
+        f"{len(proposals)} of {len(ROLES)} proposals completed. {review_summary}\n\n"
         "## Agent proposals, priors, sources, and models\n\n```json\n"
         + json.dumps(proposals, indent=2)
         + "\n```\n\n## Ensemble deliberation and revisions\n\n```json\n"
@@ -143,7 +140,6 @@ async def run_ensemble(
     model: str | None = None,
     timeout: float = 900,
     concurrency: int = 2,
-    min_members: int = 3,
     review_rounds: int = 3,
     tolerance: float = 0.01,
     member_models: dict[str, str] | None = None,
@@ -154,7 +150,6 @@ async def run_ensemble(
         model=model,
         timeout=timeout,
         concurrency=concurrency,
-        min_members=min_members,
         review_rounds=review_rounds,
         tolerance=tolerance,
         member_models=member_models or {},

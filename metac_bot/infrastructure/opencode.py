@@ -10,6 +10,10 @@ import httpx
 from .models import model_reference
 
 
+class InputRequiredError(RuntimeError):
+    """A session requested interactive input that an unattended run cannot supply."""
+
+
 class OpenCode:
     def __init__(
         self,
@@ -101,7 +105,7 @@ class OpenCode:
                             "GET", f"/api/session/{session_id}/form"
                         )
                         if forms.get("data"):
-                            raise RuntimeError(
+                            raise InputRequiredError(
                                 f"Session {session_id} needs input in OpenCode"
                             )
                 except TimeoutError as exc:

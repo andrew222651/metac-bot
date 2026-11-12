@@ -23,7 +23,6 @@ class RunConfig:
     service_start_timeout: float = 60
     single_agent: bool = False
     ensemble_concurrency: int = 2
-    ensemble_min_members: int = 3
     ensemble_review_rounds: int = 3
     ensemble_tolerance: float = 0.01
     ensemble_proposal_timeout: float | None = None
@@ -54,7 +53,6 @@ class RunConfig:
                 raise ValueError("Ensemble stage timeouts must be finite and positive")
         if (
             self.ensemble_concurrency < 1
-            or not 1 <= self.ensemble_min_members <= len(ROLES)
             or not 1 <= self.ensemble_review_rounds <= 5
             or not 0 < self.ensemble_tolerance < 1
         ):

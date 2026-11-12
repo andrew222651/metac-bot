@@ -18,7 +18,8 @@ def forecast_prompt(job_id: str, *, one_off: bool) -> str:
             if one_off
             else ""
         )
-        + "Do not change repository files."
+        + "Do not change repository files. Do not ask follow-up questions; "
+        "finish immediately after recording the result."
     )
 
 
@@ -45,5 +46,6 @@ def stage_prompt(stage: Stage, label: str, stage_id: str, *, one_off: bool) -> s
         "Use metaculus.get_bayesian_stage and metaculus.record_bayesian_stage. "
         "Follow the provided JSON schema, correct validation errors, and record your result. "
         "The Python runner pools the agents' distributions and stores the forecast; do not publish or edit files. "
+        "Do not ask follow-up questions; finish immediately after recording the result. "
         f"{standalone}"
     )

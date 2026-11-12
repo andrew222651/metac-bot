@@ -57,6 +57,7 @@ Agents can use these research tools, subject to configuration and availability:
   compare resolution rules, time horizons, prices and liquidity before using them.
 
 Agents select tools according to the question rather than calling every service.
+The listed optional research tools are exposed through the research MCP server.
 Provider-generated summaries are leads, not authority: important claims
 should be checked against dated sources. Agents search both for recent evidence
 and for historical or reference-class information, seek contrary evidence, and
@@ -75,16 +76,18 @@ Every forecasting agent's prompt includes a summary of superforecasting principl
 
 Each agent session has a configurable time limit. Agents are told their budget and
 should prioritize recording a valid result before it expires, while reporting
-incomplete research and other limitations honestly. A recorded result can be
-used if the session subsequently times out; without one, that session fails.
-The ensemble requires a configured quorum of proposals and reviews and must
-converge.
+incomplete research and other limitations honestly. Agents must not ask follow-up
+questions and should finish after recording their result. A valid recorded result can
+be used if the session subsequently times out or requests interactive input; without
+one, that session fails. Input requests are interrupted, never answered automatically.
+Permission requests and other errors do not trigger this recovery.
+The ensemble uses every successfully recorded proposal and review, without a
+minimum number of agents. If no proposal succeeds, it cannot form a forecast.
 For publishing runs, questions are processed in close-time order, with unknown close
 times last. The runner reserves 30 seconds for publication, skips a question when less
 than 60 seconds remains for forecasting, and imposes a wall-clock deadline on the
 entire forecast. Session time limits are capped to leave time for one proposal and
-review wave. Quorum and convergence remain mandatory; a timeout does not publish an
-unreviewed forecast. The runner checks the cached close time and state before publishing;
+review wave. The runner checks the cached close time and state before publishing;
 it does not refresh the question, so a platform-side early close may still reject it.
 Dry runs and questions without a known close retain the normal session limits.
 
@@ -144,10 +147,14 @@ agents' priors, posteriors, evidence, dependence assumptions, and models. Each
 reviewer flags errors and may revise the posterior for its assigned perspective
 with reasons; a critique is not itself a new evidence factor. Each round recomputes
 the pool from the agents' current posteriors and fixed weights.
-If a review does not complete, that perspective retains its previous posterior,
-provided the completed reviews meet the quorum.
-A round converges only when every completed reviewer accepts the forecast they
-reviewed and the new consensus changes by no more than the configured tolerance.
+If a review does not complete, that perspective retains its previous posterior.
+With at least one completed review, a round converges only when every completed
+reviewer accepts the forecast they reviewed and the new consensus changes by no
+more than the configured tolerance. If no reviewer completes a round, the latest
+available pooled judgments are returned with a warning that convergence was not
+established; prior completed reviews, if any, remain reflected in the pool. If
+reviewers complete but the maximum number of rounds is reached without convergence,
+the forecast fails closed. The output states how many proposals and reviews completed.
 Change is the absolute probability difference for binary questions, the largest
 option-probability difference for multiple choice, or the largest CDF difference
 for numeric and date questions. For conditional questions it is the largest

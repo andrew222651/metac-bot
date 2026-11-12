@@ -24,6 +24,7 @@ class EnvironmentTests(unittest.TestCase):
             "METAC_BOT_SERVICE_START_TIMEOUT": "55",
             "METAC_BOT_SINGLE_AGENT": "true",
             "METAC_BOT_ENSEMBLE_CONCURRENCY": "4",
+            # Retired settings in old deployments no longer impose a quorum.
             "METAC_BOT_ENSEMBLE_MIN_MEMBERS": "5",
             "METAC_BOT_ENSEMBLE_REVIEW_ROUNDS": "2",
             "METAC_BOT_ENSEMBLE_TOLERANCE": "0.03",
@@ -41,7 +42,7 @@ class EnvironmentTests(unittest.TestCase):
             self.assertEqual(config.service_start_timeout, 55)
             self.assertTrue(config.single_agent)
             self.assertEqual(config.ensemble_concurrency, 4)
-            self.assertEqual(config.ensemble_min_members, 5)
+            self.assertFalse(hasattr(config, "ensemble_min_members"))
             self.assertEqual(config.ensemble_review_rounds, 2)
             self.assertEqual(config.ensemble_tolerance, 0.03)
             self.assertEqual(config.ensemble_proposal_timeout, 301)

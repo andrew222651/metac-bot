@@ -111,9 +111,6 @@ class EnvironmentSettings(ConnectionSettings):
     METAC_BOT_ENSEMBLE_CONCURRENCY: int = Field(
         2, description="Maximum simultaneous ensemble sessions."
     )
-    METAC_BOT_ENSEMBLE_MIN_MEMBERS: int = Field(
-        3, description="Minimum successful proposals and reviews."
-    )
     METAC_BOT_ENSEMBLE_REVIEW_ROUNDS: int = Field(
         3, description="Maximum ensemble review rounds."
     )

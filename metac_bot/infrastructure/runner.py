@@ -31,7 +31,7 @@ from .deadlines import (
     remaining_seconds,
     stage_timeout_cap,
 )
-from .opencode import OpenCode
+from .opencode import InputRequiredError, OpenCode
 from .opencode_service import connect_for_run
 from .runtime import (
     check_environment,
@@ -139,7 +139,6 @@ async def _produce_forecast(
             model=args.model,
             timeout=min(args.timeout, cap),
             concurrency=args.ensemble_concurrency,
-            min_members=args.ensemble_min_members,
             review_rounds=args.ensemble_review_rounds,
             tolerance=args.ensemble_tolerance,
             member_models=args.ensemble_models,
@@ -170,19 +169,26 @@ async def _produce_forecast(
                 on_session=record_session,
                 prompt=forecast_prompt(job_id, one_off=isinstance(args, OneOffConfig)),
             )
-        except TimeoutError as timeout_error:
+        except (TimeoutError, InputRequiredError) as session_error:
             if session_id is None:
                 raise
             try:
                 read_report(job_id)
             except Exception:
-                raise timeout_error from None
+                raise session_error from None
+            recovery = (
+                "timeout_recovered"
+                if isinstance(session_error, TimeoutError)
+                else "input_recovered"
+            )
             write_json(
                 job_path(job_id) / "session.json",
-                {"session_id": session_id, "timeout_recovered": True},
+                {"session_id": session_id, recovery: True},
             )
             logger.warning(
-                "Using recorded forecast after session %s timed out", session_id
+                "Using recorded forecast after session %s: %s",
+                session_id,
+                session_error,
             )
     if not (job_path(job_id) / "forecast.json").exists():
         messages = await opencode.messages(cast(str, session_id))

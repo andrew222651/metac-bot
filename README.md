@@ -50,8 +50,12 @@ CLI options override matching environment variables. The private server normally
 
 For live runs, questions with known close times are processed earliest first. The
 runner reserves time for publication, shortens agent budgets when needed, and
-skips questions too close to closing. It never bypasses ensemble review or
-convergence. Dry runs are not close-limited.
+skips questions too close to closing. It pools all available agent results. If no
+reviewer completes a round, the forecast is returned with a warning that convergence
+was not established. If reviews complete but do not converge within the configured
+rounds, the forecast still fails. Dry runs are not close-limited.
+
+The former `METAC_BOT_ENSEMBLE_MIN_MEMBERS` setting no longer has any effect.
 
 Agents can retrieve Yahoo Finance daily closes, FRED series, and prediction-market
 candidates as research. FRED requires `FRED_API_KEY`; the other data endpoints do
@@ -88,4 +92,4 @@ After configuring secrets, open **Actions → Run bot → Run workflow**, choose
 
 ## Participate in a Metaculus competition in GitHub Actions
 
-After configuring secrets, open **Actions → Run bot**. Scheduled runs forecast on the AI tournament and MiniBench every 20 minutes, skipping questions already forecast. To start a competition run manually, choose **Run workflow** and select `tournament`; the manual default is the testing area.
+After configuring secrets, open **Actions → Run bot**. Questions in the AI tournament and MiniBench are open for only 3 hours. Scheduled runs check for open questions every 20 minutes and make only one forecast per question, skipping questions already forecast by the bot. To start a competition run manually, choose **Run workflow** and select `tournament`; the manual default is the testing area.

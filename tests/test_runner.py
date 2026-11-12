@@ -10,11 +10,64 @@ from test_bayesian import FakeOpenCode
 from metac_bot.infrastructure import runner as main
 from metac_bot.forecasting.implementation import jobs
 from metac_bot.infrastructure.config import RunConfig
+from metac_bot.infrastructure.opencode import InputRequiredError
 from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
 from metac_bot.forecasting.strategy.roles import ROLES
 
 
 class RunnerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_single_agent_recovers_valid_forecast_after_input_request(
+        self,
+    ) -> None:
+        question = BinaryQuestion(question_text="Synthetic")
+        client = AsyncMock()
+        client.create_session.return_value = "ses_test"
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+        ):
+
+            async def record_then_ask(*args: object) -> None:
+                job_id = next(Path(directory).iterdir()).name
+                jobs.save_forecast(job_id, {"probability": 0.4}, "Research", "Reason")
+                raise InputRequiredError("needs input")
+
+            client.wait.side_effect = record_then_ask
+            result = await main.forecast_question(
+                client, None, question, RunConfig(single_agent=True, dry_run=True)
+            )
+            self.assertIsInstance(result, BinaryReport)
+            job_id = next(Path(directory).iterdir()).name
+            session = jobs.read_json(jobs.job_path(job_id) / "session.json")
+            self.assertTrue(session["input_recovered"])
+
+    async def test_single_agent_input_without_valid_forecast_fails(self) -> None:
+        for malformed in (False, True):
+            with (
+                self.subTest(malformed=malformed),
+                TemporaryDirectory() as directory,
+                patch.object(jobs, "JOBS", Path(directory)),
+            ):
+                client = AsyncMock()
+                client.create_session.return_value = "ses_test"
+
+                async def request_input(*args: object) -> None:
+                    if malformed:
+                        job_id = next(Path(directory).iterdir()).name
+                        jobs.write_json(
+                            jobs.job_path(job_id) / "forecast.json", {"prediction": {}}
+                        )
+                    raise InputRequiredError("needs input")
+
+                client.wait.side_effect = request_input
+                result = await main.forecast_question(
+                    client,
+                    None,
+                    BinaryQuestion(question_text="Synthetic"),
+                    RunConfig(single_agent=True, dry_run=True),
+                )
+                self.assertIsInstance(result, InputRequiredError)
+
     async def test_single_agent_recovers_valid_forecast_on_timeout(self) -> None:
         question = BinaryQuestion(question_text="Synthetic")
         client = AsyncMock()

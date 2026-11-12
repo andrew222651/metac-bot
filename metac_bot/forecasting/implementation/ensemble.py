@@ -6,6 +6,7 @@ from typing import Any
 
 from forecasting_tools import MetaculusQuestion
 
+from ...infrastructure.opencode import InputRequiredError
 from ..strategy.prompts import Stage, stage_prompt
 from ..strategy.roles import MODEL_ROLES
 from .agent import run_agent
@@ -20,7 +21,6 @@ class EnsembleSettings:
     model: str | None = None
     timeout: float = 900
     concurrency: int = 2
-    min_members: int = 3
     review_rounds: int = 3
     tolerance: float = 0.01
     member_models: dict[str, str] = field(default_factory=dict)
@@ -57,7 +57,6 @@ class EnsembleRunner:
         self.artifacts: dict[str, Any] = {
             "stages": [],
             "rounds": [],
-            "min_members": settings.min_members,
             "convergence_tolerance": settings.tolerance,
         }
 
@@ -134,15 +133,18 @@ class EnsembleRunner:
                         agent=agent,
                         prompt=self._prompt(stage, label, stage_id),
                     )
-                except TimeoutError as timeout_error:
+                except (TimeoutError, InputRequiredError) as session_error:
                     if "session_id" not in entry:
                         raise
                     try:
                         result = read_stage(stage_id)
                     except Exception:
-                        raise timeout_error from None
+                        raise session_error from None
                     session = entry["session_id"]
-                    entry["timeout_recovered"] = True
+                    if isinstance(session_error, TimeoutError):
+                        entry["timeout_recovered"] = True
+                    else:
+                        entry["input_recovered"] = True
                 else:
                     result = read_stage(stage_id)
                 entry.update(status="complete", result=result)

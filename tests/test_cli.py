@@ -21,7 +21,6 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(
             config.ensemble_models, {"skeptic": "openrouter/openai/example#high"}
         )
-        self.assertEqual(config.ensemble_min_members, 3)
         self.assertEqual(config.ensemble_review_rounds, 3)
 
     def test_cli_defaults_match_run_config(self) -> None:
@@ -110,8 +109,6 @@ class ConfigTests(unittest.TestCase):
             "--single-agent",
             "--ensemble-concurrency",
             "3",
-            "--ensemble-min-members",
-            "4",
             "--ensemble-review-rounds",
             "2",
             "--ensemble-tolerance",
@@ -136,9 +133,6 @@ class ConfigTests(unittest.TestCase):
     def test_programmatic_config_is_validated(self) -> None:
         with self.assertRaisesRegex(ValueError, "Invalid tournament mode"):
             RunConfig(mode=cast(Any, "metaculus_cup"))
-        with self.assertRaises(ValueError):
-            RunConfig(ensemble_min_members=7)
-        self.assertEqual(RunConfig(ensemble_min_members=6).ensemble_min_members, 6)
         with self.assertRaises(ValueError):
             RunConfig(ensemble_models={"quantitative": "provider/model"})
         with self.assertRaises(ValueError):

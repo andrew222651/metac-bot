@@ -29,6 +29,10 @@ class McpEntrypointTests(unittest.IsolatedAsyncioTestCase):
                     "asknews_research",
                     "perplexity_research",
                     "exa_search",
+                    "yahoo_financial_series",
+                    "fred_financial_series",
+                    "prediction_market_search",
+                    "kalshi_market",
                 },
             ),
         )

@@ -55,10 +55,6 @@ class CommonOptions:
     ensemble_concurrency: Annotated[
         int | None, Parameter(help="Maximum simultaneous ensemble sessions.")
     ] = None
-    ensemble_min_members: Annotated[
-        int | None,
-        Parameter(help=f"Minimum successful proposals and reviews (1–{len(ROLES)})."),
-    ] = None
     ensemble_review_rounds: Annotated[
         int | None, Parameter(help="Maximum review rounds (1–5).")
     ] = None
@@ -100,7 +96,6 @@ class CommonOptions:
                 "METAC_BOT_SERVICE_START_TIMEOUT": self.service_start_timeout,
                 "METAC_BOT_SINGLE_AGENT": self.single_agent,
                 "METAC_BOT_ENSEMBLE_CONCURRENCY": self.ensemble_concurrency,
-                "METAC_BOT_ENSEMBLE_MIN_MEMBERS": self.ensemble_min_members,
                 "METAC_BOT_ENSEMBLE_REVIEW_ROUNDS": self.ensemble_review_rounds,
                 "METAC_BOT_ENSEMBLE_TOLERANCE": self.ensemble_tolerance,
                 "METAC_BOT_ENSEMBLE_PROPOSAL_TIMEOUT": self.ensemble_proposal_timeout,
@@ -154,9 +149,6 @@ class CommonOptions:
             single_agent=choose(self.single_agent, settings.METAC_BOT_SINGLE_AGENT),
             ensemble_concurrency=choose(
                 self.ensemble_concurrency, settings.METAC_BOT_ENSEMBLE_CONCURRENCY
-            ),
-            ensemble_min_members=choose(
-                self.ensemble_min_members, settings.METAC_BOT_ENSEMBLE_MIN_MEMBERS
             ),
             ensemble_review_rounds=choose(
                 self.ensemble_review_rounds, settings.METAC_BOT_ENSEMBLE_REVIEW_ROUNDS

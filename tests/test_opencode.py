@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 import httpx
-from metac_bot.infrastructure.opencode import OpenCode
+from metac_bot.infrastructure.opencode import InputRequiredError, OpenCode
 
 
 class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
@@ -138,7 +138,10 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any(path.endswith("/reply") for path in calls))
 
     async def test_missing_search_provider_form_is_reported(self) -> None:
+        calls = []
+
         async def handle(request: httpx.Request) -> httpx.Response:
+            calls.append(request.url.path)
             if request.url.path.endswith("/wait"):
                 await asyncio.sleep(10)
                 return httpx.Response(204)
@@ -151,5 +154,7 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
         async with OpenCode(
             "http://test", transport=httpx.MockTransport(handle)
         ) as client:
-            with self.assertRaisesRegex(RuntimeError, "needs input"):
+            with self.assertRaisesRegex(InputRequiredError, "needs input"):
                 await client.wait("ses_test", 0.5)
+        self.assertTrue(any(path.endswith("/interrupt") for path in calls))
+        self.assertFalse(any(path.endswith("/reply") for path in calls))
