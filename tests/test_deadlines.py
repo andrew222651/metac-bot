@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from forecasting_tools import BinaryQuestion, BinaryReport
+from forecasting_tools import BinaryQuestion
 
 from metac_bot.forecasting.implementation import jobs
 from metac_bot.infrastructure import deadlines, runner
@@ -55,15 +55,13 @@ class DeadlineTests(IsolatedAsyncioTestCase):
                     }
                 ),
             ),
-            patch.object(
-                BinaryReport, "publish_report_to_metaculus", new_callable=AsyncMock
-            ) as publish,
+            patch.object(runner, "publish_prediction") as publish,
         ):
             result = await runner.forecast_question(
                 AsyncMock(), MagicMock(), question, RunConfig()
             )
         self.assertIsInstance(result, RuntimeError)
-        publish.assert_not_awaited()
+        publish.assert_not_called()
 
     async def test_whole_forecast_timeout_does_not_publish(self) -> None:
         async def slow(*args: object, **kwargs: object) -> None:
@@ -75,15 +73,13 @@ class DeadlineTests(IsolatedAsyncioTestCase):
             patch.object(runner, "forecast_budget", return_value=0.01),
             patch.object(runner, "MIN_FORECAST_BUDGET", 0),
             patch.object(runner, "run_ensemble", side_effect=slow),
-            patch.object(
-                BinaryReport, "publish_report_to_metaculus", new_callable=AsyncMock
-            ) as publish,
+            patch.object(runner, "publish_prediction") as publish,
         ):
             result = await runner.forecast_question(
                 AsyncMock(), MagicMock(), self.question(300), RunConfig()
             )
         self.assertIsInstance(result, TimeoutError)
-        publish.assert_not_awaited()
+        publish.assert_not_called()
 
     async def test_live_selection_prioritizes_close_before_limit(self) -> None:
         later, sooner = self.question(600), self.question(300)

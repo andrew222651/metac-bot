@@ -5,7 +5,6 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from forecasting_tools import BinaryQuestion, BinaryReport, NumericQuestion
-from forecasting_tools.data_models.data_organizer import DataOrganizer
 from test_bayesian import FakeOpenCode
 from metac_bot.infrastructure import runner as main
 from metac_bot.forecasting.implementation import jobs
@@ -127,26 +126,25 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
     async def test_numeric_default_ensemble_reaches_publication(self) -> None:
         question = NumericQuestion(
             question_text="How many?",
+            id_of_post=1,
+            id_of_question=2,
             lower_bound=0,
             upper_bound=100,
             open_lower_bound=False,
             open_upper_bound=False,
         )
-        report_type = DataOrganizer.get_report_type_for_question_type(type(question))
         client = FakeOpenCode()
         metaculus = MagicMock()
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
-            patch.object(
-                report_type, "publish_report_to_metaculus", new_callable=AsyncMock
-            ) as publish,
         ):
             result = await main.forecast_question(
                 cast(main.OpenCode, client), metaculus, question, RunConfig()
             )
             self.assertNotIsInstance(result, Exception)
-            publish.assert_awaited_once()
+            metaculus.post_numeric_question_prediction.assert_called_once()
+            metaculus.post_question_comment.assert_not_called()
             self.assertEqual(len(client.sessions), 2 * len(ROLES))
 
     async def test_environment_failure_returns_without_starting_opencode(self) -> None:
@@ -222,14 +220,22 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             patch.object(main, "print_run_summary_banner"),
             patch.object(main, "MetaculusClient", return_value=metaculus),
             patch.object(main, "connect_for_run", return_value=client),
-            patch.object(
-                BinaryReport, "publish_report_to_metaculus", new_callable=AsyncMock
-            ) as publish,
         ):
             result = await main.run(args)
             self.assertEqual(client.create_session.await_count, 1)
             self.assertIn(SUPERFORECASTING_PRINCIPLES, client.prompt.await_args.args[1])
-            return result, publish.await_count
+            metaculus.post_question_comment.assert_not_called()
+            if record and not dry_run:
+                metaculus.post_binary_question_prediction.assert_called_once_with(
+                    2, 0.4
+                )
+                job_id = next(jobs.JOBS.iterdir()).name
+                self.assertIn("Research", jobs.read_report(job_id).explanation)
+                self.assertEqual(
+                    jobs.read_json(jobs.job_path(job_id) / "result.json"),
+                    {"published": True},
+                )
+            return result, metaculus.post_binary_question_prediction.call_count
 
     async def test_dry_run_never_publishes(self) -> None:
         self.assertEqual(await self.exercise(dry_run=True), (0, 0))
@@ -263,12 +269,10 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             patch.object(
                 main, "run_ensemble", new_callable=AsyncMock, return_value=result
             ) as ensemble,
-            patch.object(
-                BinaryReport, "publish_report_to_metaculus", new_callable=AsyncMock
-            ) as publish,
+            patch.object(main, "publish_prediction") as publish,
         ):
             self.assertEqual(await main.run(args), 0)
             ensemble.assert_awaited_once()
-            publish.assert_not_awaited()
+            publish.assert_not_called()
             job_id = next(Path(directory).iterdir()).name
             self.assertEqual(jobs.read_report(job_id).prediction, 0.4)

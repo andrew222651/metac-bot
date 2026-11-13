@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from forecasting_tools import BinaryReport, MultipleChoiceQuestion, MultipleChoiceReport
+from forecasting_tools import MultipleChoiceQuestion
 
 from metac_bot.infrastructure import runner
 from metac_bot.forecasting.implementation import jobs
@@ -121,11 +121,7 @@ class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
             patch.object(
                 runner, "run_ensemble", new_callable=AsyncMock, return_value=result
             ) as ensemble,
-            patch.object(
-                MultipleChoiceReport,
-                "publish_report_to_metaculus",
-                new_callable=AsyncMock,
-            ) as publish,
+            patch.object(runner, "publish_prediction") as publish,
             redirect_stdout(io.StringIO()) as output,
         ):
             self.assertEqual(await runner.run_one_off(config), 0)
@@ -137,7 +133,7 @@ class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
                 startup_timeout=config.service_start_timeout,
                 client_factory=runner.OpenCode,
             )
-            publish.assert_not_awaited()
+            publish.assert_not_called()
             assert ensemble.await_args is not None
             question = ensemble.await_args.args[1]
             self.assertIsInstance(question, MultipleChoiceQuestion)
@@ -166,14 +162,12 @@ class OneOffRunnerTests(unittest.IsolatedAsyncioTestCase):
             with (
                 patch.object(runner, "MetaculusClient") as metaculus,
                 patch.object(runner, "connect_for_run", return_value=client),
-                patch.object(
-                    BinaryReport, "publish_report_to_metaculus", new_callable=AsyncMock
-                ) as publish,
+                patch.object(runner, "publish_prediction") as publish,
                 redirect_stdout(io.StringIO()) as output,
             ):
                 self.assertEqual(await runner.run_one_off(config), 0)
                 metaculus.assert_not_called()
-                publish.assert_not_awaited()
+                publish.assert_not_called()
                 self.assertIn("Yes: 60.0%", output.getvalue())
                 self.assertIn(
                     "do not look it up on Metaculus", client.prompt.await_args.args[1]

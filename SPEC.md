@@ -166,3 +166,7 @@ posteriors, evidence and sources, dependence assumptions, review and revision
 history, weights, model artifacts, and remaining limitations. Probability bounds
 and platform conversion may be applied to the reported prediction; the
 underlying pooled judgments are retained separately.
+
+Publishing runs submit predictions to Metaculus without posting comments. Research
+and rationale remain in the locally saved report. Conditional questions submit the
+yes and no branch predictions without comments; dry runs publish neither.

@@ -11,7 +11,8 @@ def forecast_prompt(job_id: str, *, one_off: bool) -> str:
     return (
         f"Load the metaculus-forecast skill and complete forecasting job {job_id}. "
         "Use the Metaculus MCP tools to read the question and record your validated "
-        "forecast. Research with your web tools. The runner handles output and publication settings. "
+        "forecast. Research with your web tools. The runner handles output and publication; "
+        "do not publish forecasts or post comments yourself. "
         + (
             "This is a standalone user-supplied question: do not look it up on Metaculus, "
             "ask for a Metaculus token, or publish it. "
@@ -45,7 +46,8 @@ def stage_prompt(stage: Stage, label: str, stage_id: str, *, one_off: bool) -> s
         f"{instructions} "
         "Use metaculus.get_bayesian_stage and metaculus.record_bayesian_stage. "
         "Follow the provided JSON schema, correct validation errors, and record your result. "
-        "The Python runner pools the agents' distributions and stores the forecast; do not publish or edit files. "
+        "The Python runner pools the agents' distributions and stores the forecast; "
+        "do not publish forecasts, post comments, or edit files. "
         "Do not ask follow-up questions; finish immediately after recording the result. "
         f"{standalone}"
     )

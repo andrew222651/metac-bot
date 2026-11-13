@@ -6,10 +6,15 @@ from typing import Any, cast
 
 from forecasting_tools import (
     BinaryQuestion,
+    BinaryReport,
+    ConditionalReport,
     ForecastReport,
     MetaculusClient,
     MetaculusQuestion,
     MultipleChoiceQuestion,
+    MultipleChoiceReport,
+    NumericDistribution,
+    NumericReport,
     PredictedOptionList,
 )
 
@@ -40,6 +45,37 @@ from .runtime import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def publish_prediction(report: ForecastReport, metaculus: MetaculusClient) -> None:
+    """Publish only predictions; the library's report publisher also posts comments."""
+    if isinstance(report, ConditionalReport):
+        publish_prediction(report.yes_report, metaculus)
+        publish_prediction(report.no_report, metaculus)
+        return
+
+    question_id = report.question.id_of_question
+    if question_id is None:
+        raise ValueError("Publishing to Metaculus requires a question ID")
+    if report.question.id_of_post is None:
+        raise ValueError("Publishing to Metaculus requires a post ID for the question")
+    if isinstance(report, BinaryReport):
+        metaculus.post_binary_question_prediction(question_id, report.prediction)
+    elif isinstance(report, MultipleChoiceReport):
+        metaculus.post_multiple_choice_question_prediction(
+            question_id, report.prediction.to_dict()
+        )
+    elif isinstance(report, NumericReport):
+        prediction = report.prediction
+        if prediction.cdf_size is None:
+            prediction = NumericDistribution.from_question(
+                prediction.declared_percentiles, report.question
+            )
+        metaculus.post_numeric_question_prediction(
+            question_id, [percentile.percentile for percentile in prediction.get_cdf()]
+        )
+    else:
+        raise ValueError(f"Unsupported report type: {type(report).__name__}")
 
 
 async def select_questions(
@@ -102,7 +138,9 @@ async def forecast_question(
             remaining = remaining_seconds(question)
             if is_closed(question) or (remaining is not None and remaining <= 0):
                 raise RuntimeError("Question closed before publication")
-            await report.publish_report_to_metaculus(metaculus)
+            if metaculus is None:
+                raise ValueError("Publishing to Metaculus requires a client")
+            await asyncio.to_thread(publish_prediction, report, metaculus)
         write_json(job_path(job_id) / "result.json", {"published": not args.dry_run})
         return report
     except Exception as exc:

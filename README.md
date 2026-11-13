@@ -88,7 +88,7 @@ The model fallbacks are `openrouter/openai/gpt-4.1-mini`, `openai/gpt-4.1-mini`,
 
 After configuring secrets, open **Actions → Run bot → Run workflow**, choose a branch, and select `test_questions` (the default). Optionally set the model, search provider, session timeout, or ensemble concurrency, and start the run. Download the `forecasts-test_questions` artifact from the completed run for its reports and session artifacts.
 
-**The test mode publishes forecasts and comments to the Metaculus testing area.** The workflow does not accept a custom one-off question or offer a dry-run input. For a private, user-supplied forecast, use the Termux one-off command above.
+**The test mode publishes forecasts, but not comments, to the Metaculus testing area.** Reports and explanations remain in the downloaded artifact. The workflow does not accept a custom one-off question or offer a dry-run input. For a private, user-supplied forecast, use the Termux one-off command above.
 
 ## Participate in a Metaculus competition in GitHub Actions
 

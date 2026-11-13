@@ -7,10 +7,21 @@ from scipy.stats import norm
 
 from metac_bot.forecasting.strategy.aggregation import posterior_change
 from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
+from metac_bot.forecasting.strategy.prompts import forecast_prompt, stage_prompt
 from metac_bot.forecasting.strategy.workflow import uses_ensemble
 
 
 class StrategyTests(unittest.TestCase):
+    def test_agents_are_told_not_to_publish_or_comment(self) -> None:
+        self.assertIn(
+            "do not publish forecasts or post comments",
+            forecast_prompt("job", one_off=False),
+        )
+        self.assertIn(
+            "do not publish forecasts, post comments",
+            stage_prompt("proposal", "generalist", "stage", one_off=False),
+        )
+
     def test_forecasting_guidance_prioritizes_accuracy(self) -> None:
         self.assertIn("accurate probability distribution", SUPERFORECASTING_PRINCIPLES)
         self.assertIn(
