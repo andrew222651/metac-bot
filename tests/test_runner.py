@@ -1,13 +1,16 @@
 from pathlib import Path
+import os
 from tempfile import TemporaryDirectory
 from typing import cast
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 from forecasting_tools import BinaryQuestion, BinaryReport, NumericQuestion
 from test_bayesian import FakeOpenCode
 from metac_bot.infrastructure import runner as main
 from metac_bot.forecasting.implementation import jobs
+from metac_bot.forecasting.implementation import research_mcp
 from metac_bot.infrastructure.config import RunConfig
 from metac_bot.infrastructure.opencode import InputRequiredError
 from metac_bot.forecasting.strategy.principles import SUPERFORECASTING_PRINCIPLES
@@ -15,6 +18,47 @@ from metac_bot.forecasting.strategy.roles import ROLES
 
 
 class RunnerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_optional_credit_failure_does_not_prevent_recorded_forecast(
+        self,
+    ) -> None:
+        question = BinaryQuestion(question_text="Synthetic")
+        client = AsyncMock()
+        client.create_session.return_value = "ses_test"
+        provider_error = httpx.HTTPStatusError(
+            "private API response",
+            request=httpx.Request("POST", "https://example.org"),
+            response=httpx.Response(402),
+        )
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(jobs, "JOBS", Path(directory)),
+            patch.dict(os.environ, {"ASKNEWS_API_KEY": "test-key"}, clear=True),
+            patch.dict(research_mcp._cooldowns, {}, clear=True),
+            patch("forecasting_tools.AskNewsSearcher") as searcher,
+        ):
+            searcher.return_value.call_preconfigured_version = AsyncMock(
+                side_effect=provider_error
+            )
+
+            async def use_fallback(*args: object) -> None:
+                result = await research_mcp.asknews_research("test")
+                self.assertEqual(result["status"], "unavailable")
+                job_id = next(Path(directory).iterdir()).name
+                jobs.save_forecast(
+                    job_id,
+                    {"probability": 0.4},
+                    "AskNews unavailable; used alternative evidence.",
+                    "Reason",
+                )
+
+            client.wait.side_effect = use_fallback
+            report = await main.forecast_question(
+                client, None, question, RunConfig(single_agent=True, dry_run=True)
+            )
+            self.assertIsInstance(report, BinaryReport)
+            assert isinstance(report, BinaryReport)
+            self.assertIn("AskNews unavailable", report.explanation)
+
     async def test_single_agent_recovers_valid_forecast_after_input_request(
         self,
     ) -> None:

@@ -5,5 +5,6 @@ RESEARCH_INSTRUCTIONS = (
     "Load the forecasting-research skill for source selection and synthesis. "
     "AskNews and Perplexity return provider-generated research; verify cited sources. "
     "Exa returns source text for OpenCode to synthesize. Financial series and "
-    "prediction-market tools provide dated raw data and unverified candidates."
+    "prediction-market tools provide dated raw data and unverified candidates. "
+    "A status of unavailable is not research: use other sources and report the limitation."
 )

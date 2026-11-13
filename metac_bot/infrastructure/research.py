@@ -9,6 +9,7 @@ from typing import Literal
 import httpx
 
 from .runtime import is_real_env
+from .provider_errors import ProviderUnavailable
 
 
 def available_providers() -> dict[str, bool]:
@@ -23,7 +24,7 @@ def available_providers() -> dict[str, bool]:
 
 def require_provider(provider: str) -> None:
     if not available_providers()[provider]:
-        raise ValueError(
+        raise ProviderUnavailable(
             f"{provider} is not configured in the research MCP environment or project .env"
         )
 
@@ -39,12 +40,21 @@ async def post_json(
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             # Do not forward provider bodies or authentication headers to the model.
-            raise RuntimeError(
-                f"{provider} returned HTTP {exc.response.status_code}; check credentials, quota, and request parameters"
+            raise ProviderUnavailable(
+                f"{provider} returned HTTP {exc.response.status_code}; check credentials, quota, and request parameters",
+                status_code=exc.response.status_code,
             ) from None
         except httpx.RequestError:
-            raise RuntimeError(f"{provider} request failed or timed out") from None
-        return response.json()
+            raise ProviderUnavailable(
+                f"{provider} request failed or timed out"
+            ) from None
+        try:
+            data = response.json()
+        except ValueError:
+            raise ProviderUnavailable(f"{provider} returned invalid JSON") from None
+        if not isinstance(data, dict):
+            raise ProviderUnavailable(f"{provider} returned an invalid response")
+        return data
 
 
 async def asknews_research(
@@ -57,28 +67,33 @@ async def asknews_research(
     # Import lazily: Exa/Perplexity do not need forecasting-tools initialized.
     with contextlib.redirect_stdout(sys.stderr):
         from forecasting_tools import AskNewsSearcher
-    searcher = AskNewsSearcher(
-        client_id=os.getenv("ASKNEWS_CLIENT_ID")
-        if is_real_env("ASKNEWS_CLIENT_ID")
-        else None,
-        client_secret=os.getenv("ASKNEWS_SECRET")
-        if is_real_env("ASKNEWS_SECRET")
-        else None,
-        api_key=os.getenv("ASKNEWS_API_KEY")
-        if is_real_env("ASKNEWS_API_KEY")
-        else None,
-    )
     preset = (
         "asknews/news-summaries"
         if depth == "news"
         else f"asknews/deep-research/{depth}-depth"
     )
     try:
+        searcher = AskNewsSearcher(
+            client_id=os.getenv("ASKNEWS_CLIENT_ID")
+            if is_real_env("ASKNEWS_CLIENT_ID")
+            else None,
+            client_secret=os.getenv("ASKNEWS_SECRET")
+            if is_real_env("ASKNEWS_SECRET")
+            else None,
+            api_key=os.getenv("ASKNEWS_API_KEY")
+            if is_real_env("ASKNEWS_API_KEY")
+            else None,
+        )
         async with asyncio.timeout(600):
             text = await searcher.call_preconfigured_version(preset, query)
     except Exception as exc:
-        raise RuntimeError(
-            f"AskNews research failed ({type(exc).__name__}); check credentials and quota"
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        status = status if isinstance(status, int) and 400 <= status <= 599 else None
+        detail = (
+            f"HTTP {status}" if status is not None else "request failed or timed out"
+        )
+        raise ProviderUnavailable(
+            f"AskNews {detail}; check credentials and quota", status_code=status
         ) from None
     return {
         "provider": "asknews",
@@ -103,8 +118,8 @@ async def perplexity_research(
         timeout=600,
     )
     if data.get("status") != "completed":
-        raise RuntimeError(
-            f"Perplexity did not complete the research (status={data.get('status')})"
+        raise ProviderUnavailable(
+            "Perplexity did not complete the research; check provider availability and quota"
         )
     messages = [
         item for item in data.get("output", []) if item.get("type") == "message"
@@ -116,7 +131,7 @@ async def perplexity_research(
         if part.get("type") == "output_text"
     )
     if not text.strip():
-        raise RuntimeError("Perplexity returned no research text")
+        raise ProviderUnavailable("Perplexity returned no research text")
     return {
         "provider": "perplexity",
         "provider_generated": True,

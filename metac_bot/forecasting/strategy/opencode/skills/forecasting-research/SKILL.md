@@ -41,7 +41,11 @@ description: Research forecasting questions using native web tools, AskNews, Per
    without a separate Python LLM call. Keep facts distinct from inference and
    record URLs, publication dates, assumptions, and unresolved uncertainty.
 
-If a provider lacks credentials, fails, or is rate limited, use another available
-source and state the limitation. Do not repeatedly retry a failing paid call or
-claim searches were performed when they were not. Research services only supply
-evidence; the forecasting skill determines the final prediction.
+If a provider lacks credentials, fails, runs out of credits, or is rate limited,
+including a native web tool, use another available source and state the limitation.
+An optional MCP result with `status: unavailable` is a failure, not evidence or a
+successful search. Do not repeatedly retry a failing paid call, request credentials,
+or claim searches were performed when they were not. If no alternative is available,
+explain the missing evidence and finish with the best supported forecast only if it
+can be made responsibly. Research services only supply evidence; the forecasting
+skill determines the final prediction.

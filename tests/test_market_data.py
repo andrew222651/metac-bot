@@ -1,8 +1,15 @@
+import json
 import os
 import unittest
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
+import httpx
+from mcp.types import TextContent
+
 from metac_bot.infrastructure import market_data
+from metac_bot.infrastructure.provider_errors import ProviderUnavailable
+from metac_bot.forecasting.implementation import research_mcp
 
 
 class MarketDataTests(unittest.IsolatedAsyncioTestCase):
@@ -37,7 +44,7 @@ class MarketDataTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_fred_requires_key_and_never_returns_it(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaisesRegex(ValueError, "FRED_API_KEY"):
+            with self.assertRaisesRegex(ProviderUnavailable, "FRED_API_KEY"):
                 await market_data.fred_series("CPIAUCSL")
         with (
             patch.dict(os.environ, {"FRED_API_KEY": "sensitive"}, clear=True),
@@ -78,6 +85,32 @@ class MarketDataTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("secret", str(result))
         self.assertIn("unverified", result["note"])
+
+    async def test_fred_payment_error_is_safe_and_not_retried_during_cooldown(
+        self,
+    ) -> None:
+        requests = []
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return httpx.Response(402, text="secret-key provider error")
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+        with (
+            patch.dict(os.environ, {"FRED_API_KEY": "secret-key"}, clear=True),
+            patch.dict(research_mcp._cooldowns, {}, clear=True),
+            patch.object(market_data.httpx, "AsyncClient", return_value=client),
+        ):
+            output = await research_mcp.mcp.call_tool(
+                "fred_financial_series", {"series_id": "CPIAUCSL"}
+            )
+            result = json.loads(cast(list[TextContent], output)[0].text)
+            again = await research_mcp.fred_financial_series("GDP")
+        self.assertEqual(result["status"], "unavailable")
+        self.assertIn("HTTP 402", result["reason"])
+        self.assertNotIn("secret-key", str(result))
+        self.assertEqual(result, again)
+        self.assertEqual(len(requests), 1)
 
     async def test_kalshi_keeps_distinct_bid_and_ask(self) -> None:
         with patch.object(

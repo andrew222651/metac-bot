@@ -1,13 +1,16 @@
 import json
 import os
 import unittest
-from typing import Literal
+from typing import Literal, cast
 from unittest.mock import AsyncMock, patch
 
 import httpx
+from mcp.types import TextContent
 
 from metac_bot.infrastructure import research
+from metac_bot.forecasting.implementation import research_mcp
 from metac_bot.forecasting.implementation.research_mcp import mcp
+from metac_bot.infrastructure.provider_errors import ProviderUnavailable
 
 
 class ResearchTests(unittest.IsolatedAsyncioTestCase):
@@ -29,7 +32,7 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
             patch.dict(os.environ, {}, clear=True),
             patch.object(research, "post_json") as post,
         ):
-            with self.assertRaisesRegex(ValueError, "not configured"):
+            with self.assertRaisesRegex(ProviderUnavailable, "not configured"):
                 await research.exa_search("query")
             post.assert_not_called()
 
@@ -145,6 +148,124 @@ class ResearchTests(unittest.IsolatedAsyncioTestCase):
                     preset, "query"
                 )
                 self.assertEqual(result["text"], "Research with sources")
+
+    async def test_asknews_credit_failure_is_safe_and_cools_down(self) -> None:
+        error = httpx.HTTPStatusError(
+            "secret-provider-body test-key",
+            request=httpx.Request("POST", "https://example.org"),
+            response=httpx.Response(402),
+        )
+        search = AsyncMock(side_effect=error)
+        with (
+            patch.dict(os.environ, {"ASKNEWS_API_KEY": "test-key"}, clear=True),
+            patch.dict(research_mcp._cooldowns, {}, clear=True),
+            patch("forecasting_tools.AskNewsSearcher") as searcher,
+            patch.object(research_mcp.time, "monotonic", return_value=100),
+        ):
+            searcher.return_value.call_preconfigured_version = search
+            first_output = await mcp.call_tool("asknews_research", {"query": "test"})
+            second_output = await mcp.call_tool("asknews_research", {"query": "other"})
+            first = json.loads(cast(list[TextContent], first_output)[0].text)
+            second = json.loads(cast(list[TextContent], second_output)[0].text)
+            self.assertEqual(first, second)
+            self.assertEqual(first["status"], "unavailable")
+            self.assertIn("HTTP 402", first["reason"])
+            self.assertIn("another source", first["guidance"])
+            self.assertNotIn("test-key", str(first))
+            self.assertNotIn("secret-provider-body", str(first))
+            search.assert_awaited_once()
+
+    async def test_asknews_constructor_failure_is_sanitized(self) -> None:
+        with (
+            patch.dict(os.environ, {"ASKNEWS_API_KEY": "test-key"}, clear=True),
+            patch.dict(research_mcp._cooldowns, {}, clear=True),
+            patch(
+                "forecasting_tools.AskNewsSearcher", side_effect=ValueError("test-key")
+            ),
+        ):
+            result = await research_mcp.asknews_research("test")
+        self.assertEqual(result["status"], "unavailable")
+        self.assertNotIn("test-key", str(result))
+
+    async def test_payment_and_rate_limit_cooldowns_expire_and_are_independent(
+        self,
+    ) -> None:
+        for status, delay in ((402, 300), (429, 30)):
+            with (
+                self.subTest(status=status),
+                patch.dict(research_mcp._cooldowns, {}, clear=True),
+            ):
+                call = AsyncMock(
+                    side_effect=[
+                        ProviderUnavailable(f"Exa returned HTTP {status}", status),
+                        {"provider": "exa", "results": ["success"]},
+                    ]
+                )
+                other = AsyncMock(return_value={"provider": "perplexity", "text": "ok"})
+                with patch.object(
+                    research_mcp.time, "monotonic", return_value=100
+                ) as clock:
+                    first = await research_mcp._optional_result("exa", call)
+                    second = await research_mcp._optional_result("exa", call)
+                    alternative = await research_mcp._optional_result(
+                        "perplexity", other
+                    )
+                    self.assertEqual(first, second)
+                    self.assertEqual(first["status"], "unavailable")
+                    self.assertEqual(alternative["text"], "ok")
+                    call.assert_awaited_once()
+                    clock.return_value += delay
+                    result = await research_mcp._optional_result("exa", call)
+                    self.assertEqual(result["results"], ["success"])
+                    self.assertEqual(call.await_count, 2)
+
+    async def test_other_failures_do_not_trigger_cooldown(self) -> None:
+        with patch.dict(research_mcp._cooldowns, {}, clear=True):
+            call = AsyncMock(
+                side_effect=[
+                    ProviderUnavailable("service unavailable", 503),
+                    {"provider": "exa", "results": []},
+                ]
+            )
+            self.assertEqual(
+                (await research_mcp._optional_result("exa", call))["status"],
+                "unavailable",
+            )
+            self.assertEqual(
+                (await research_mcp._optional_result("exa", call))["results"], []
+            )
+            self.assertEqual(call.await_count, 2)
+
+    async def test_exa_and_perplexity_http_payment_errors_are_safe(self) -> None:
+        for name, tool in (
+            ("EXA_API_KEY", "exa_search"),
+            ("PERPLEXITY_API_KEY", "perplexity_research"),
+        ):
+            with (
+                self.subTest(tool=tool),
+                patch.dict(research_mcp._cooldowns, {}, clear=True),
+            ):
+                client = httpx.AsyncClient(
+                    transport=httpx.MockTransport(
+                        lambda request: httpx.Response(
+                            402, text="secret-key and provider body"
+                        )
+                    )
+                )
+                with (
+                    patch.dict(os.environ, {name: "secret-key"}, clear=True),
+                    patch.object(research.httpx, "AsyncClient", return_value=client),
+                ):
+                    output = await mcp.call_tool(tool, {"query": "test"})
+                    result = json.loads(cast(list[TextContent], output)[0].text)
+                self.assertEqual(result["status"], "unavailable")
+                self.assertIn("HTTP 402", result["reason"])
+                self.assertNotIn("secret-key", str(result))
+
+    async def test_invalid_provider_arguments_remain_validation_errors(self) -> None:
+        with patch.dict(os.environ, {"EXA_API_KEY": "test-key"}, clear=True):
+            with self.assertRaises(ValueError):
+                await research_mcp.exa_search("query", num_results=11)
 
     async def test_mcp_catalog_exposes_bounded_provider_tools(self) -> None:
         tools = {tool.name: tool for tool in await mcp.list_tools()}

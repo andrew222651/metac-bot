@@ -11,6 +11,7 @@ from urllib.parse import quote
 import httpx
 
 from .runtime import is_real_env
+from .provider_errors import ProviderUnavailable
 
 # FRED requires its key in the query string; httpx logs complete URLs at INFO.
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -27,9 +28,14 @@ async def _get(url: str, params: dict[str, Any] | None = None) -> Any:
                 response = await client.get(url, params=params)
                 response.raise_for_status()
                 return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise ProviderUnavailable(
+            f"Data provider returned HTTP {exc.response.status_code}; check credentials, quota, and request parameters",
+            status_code=exc.response.status_code,
+        ) from None
     except (httpx.HTTPError, ValueError, TimeoutError):
         # URLs and response bodies can contain API keys; do not expose them.
-        raise RuntimeError(
+        raise ProviderUnavailable(
             "Data provider request failed or returned invalid JSON"
         ) from None
 
@@ -58,7 +64,7 @@ async def yahoo_series(symbol: str) -> dict:
             if v is not None
         ]
     except (KeyError, IndexError, TypeError, ValueError):
-        raise RuntimeError("Yahoo Finance returned no usable series") from None
+        raise ProviderUnavailable("Yahoo Finance returned no usable series") from None
     return {
         "provider": "Yahoo Finance",
         "symbol": symbol,
@@ -75,7 +81,7 @@ async def fred_series(series_id: str) -> dict:
     series_id = _identifier(series_id, r"[A-Za-z0-9_]{1,40}")
     key = os.getenv("FRED_API_KEY", "").strip()
     if not key or not is_real_env("FRED_API_KEY"):
-        raise ValueError("FRED_API_KEY is not configured")
+        raise ProviderUnavailable("FRED_API_KEY is not configured")
     data = await _get(
         "https://api.stlouisfed.org/fred/series/observations",
         {
@@ -87,7 +93,7 @@ async def fred_series(series_id: str) -> dict:
         },
     )
     if not isinstance(data, dict) or not isinstance(data.get("observations"), list):
-        raise RuntimeError("FRED returned no usable series")
+        raise ProviderUnavailable("FRED returned no usable series")
     return {
         "provider": "FRED",
         "series_id": series_id,
@@ -269,7 +275,7 @@ async def kalshi_market(ticker: str) -> dict:
     ticker = _identifier(ticker, r"[A-Za-z0-9._-]{1,100}")
     data = await _get(f"https://api.elections.kalshi.com/trade-api/v2/markets/{ticker}")
     if not isinstance(data, dict) or not isinstance(data.get("market"), dict):
-        raise RuntimeError("Invalid Kalshi response")
+        raise ProviderUnavailable("Invalid Kalshi response")
     market = data["market"]
     return {
         "provider": "kalshi",

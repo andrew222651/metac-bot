@@ -62,6 +62,7 @@ Provider-generated summaries are leads, not authority: important claims
 should be checked against dated sources. Agents search both for recent evidence
 and for historical or reference-class information, seek contrary evidence, and
 report unavailable tools or missing information without inventing sources.
+Failed calls to optional services are treated as the service not being used.
 
 All agents are informed that their Python environment includes NumPy,
 SciPy, SymPy, pandas, statsmodels, NetworkX, PyMC, and ArviZ.

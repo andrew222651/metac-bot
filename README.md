@@ -63,6 +63,11 @@ not require credentials. Kalshi search scans only part of its catalogue; exact
 lookup requires a known market ticker. Agents
 must check market resolution rules, timestamps, and liquidity rather than treating
 a search hit as an equivalent forecast. Data sources can be unavailable or stale.
+If an optional research service fails or runs out of credits, agents use other
+available sources and report the gap; they can still forecast with limited evidence
+when doing so responsibly is possible.
+The research MCP briefly pauses repeat calls after payment or rate-limit errors.
+Configured credentials do not guarantee a provider has available credit.
 
 In your repository, open **Settings → Secrets and variables → Actions → Secrets** and add:
 
