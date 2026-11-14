@@ -38,6 +38,7 @@ concurrency:
 
 jobs:
   forecast_job:
+    if: ${{ github.event_name != 'schedule' || vars.METAC_BOT_SCHEDULE_ENABLED != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository

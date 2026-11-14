@@ -118,6 +118,17 @@ class CiConfigurationTests(unittest.TestCase):
                 args = self.log.read_text().splitlines()
                 self.assertEqual(args[args.index("--mode") + 1], mode)
 
+    def test_schedule_is_enabled_by_default_and_can_be_disabled_without_blocking_dispatch(
+        self,
+    ) -> None:
+        data = yaml.safe_load((ROOT / ".github/workflows/run_bot.yaml").read_text())
+        self.assertTrue(data[True]["schedule"])
+        self.assertIn("workflow_dispatch", data[True])
+        self.assertEqual(
+            data["jobs"]["forecast_job"]["if"],
+            "${{ github.event_name != 'schedule' || vars.METAC_BOT_SCHEDULE_ENABLED != 'false' }}",
+        )
+
     def test_run_bot_workflow_offers_dispatch_inputs(self) -> None:
         data = yaml.safe_load((ROOT / ".github/workflows/run_bot.yaml").read_text())
         # PyYAML's YAML 1.1 parser interprets the key "on" as True.

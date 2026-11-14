@@ -92,6 +92,11 @@ review wave. The runner checks the cached close time and state before publishing
 it does not refresh the question, so a platform-side early close may still reject it.
 Dry runs and questions without a known close retain the normal session limits.
 
+The GitHub Actions workflow checks for questions every 20 minutes by default.
+Setting the repository variable `METAC_BOT_SCHEDULE_ENABLED` to `false` skips
+scheduled forecast jobs; an unset variable keeps them enabled. Manual runs remain
+available regardless of this variable.
+
 
 ## Ensemble aggregation and review
 

@@ -82,6 +82,7 @@ Set optional variables under **Settings → Secrets and variables → Actions �
 
 | Setting | Repository variable | Fallback |
 | --- | --- | --- |
+| Scheduled runs | `METAC_BOT_SCHEDULE_ENABLED` | Enabled; set to `false` to skip scheduled runs without disabling manual runs |
 | Model | `OPENCODE_MODEL` | Chosen from available provider keys, in OpenRouter, OpenAI, then Anthropic order |
 | Search provider | `OPENCODE_SEARCH_PROVIDER` | `random` |
 | Session timeout | `METAC_BOT_SESSION_TIMEOUT` | `900` seconds |
