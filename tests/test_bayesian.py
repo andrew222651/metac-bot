@@ -796,7 +796,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                         record_stage(stage_id, proposal_result)
 
                 with patch.object(client, "wait", side_effect=omit_model):
-                    result = await run_ensemble(client, question, job_id)
+                    await run_ensemble(client, question, job_id)
                 artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
                 self.assertNotIn(role, artifact["weights"])
                 self.assertEqual(len(artifact["weights"]), len(ROLES) - 1)
