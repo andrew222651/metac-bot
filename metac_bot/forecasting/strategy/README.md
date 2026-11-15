@@ -10,9 +10,11 @@ This package describes the bot's forecasting behavior; the neighboring
   the detailed forecasting, research, and modeling guidance.
 - The ensemble gathers all successful posterior proposals and runs independent review
   rounds. It pools current distributions with equal weights, without treating shared sources as
-  independent. With completed reviews it fails closed unless all completed reviewers
-  accept and the consensus change is within the configured tolerance. If a round
-  produces no reviews, it returns the latest available pool with a warning.
+  independent. A round converges only when every completed reviewer accepts and the
+  consensus change is within the configured tolerance. If a round produces no
+  reviews, it returns the latest available pool with a warning. If reviewers
+  complete but the maximum number of rounds is reached without convergence, it
+  outputs the linear pooled forecast with a warning.
 - `pooling.py` handles all question types and coherent conditional joints;
   `distributions.py` provides numeric and date CDF interpolation, explicit tail
   assumptions, pooling, and bounded convergence comparison. Platform output
