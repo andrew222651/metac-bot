@@ -47,7 +47,7 @@ def make_result(
         + json.dumps(current["decision"], indent=2)
         + "\n```\n\n## Evidence candidates and sources\n\n```json\n"
         + json.dumps(candidates, indent=2)
-        + "\n```\n\n## Economic and causal models\n\n```json\n"
+        + "\n```\n\n## Model artifacts\n\n```json\n"
         + json.dumps(models, indent=2)
         + "\n```"
     )

@@ -9,7 +9,8 @@ independently on your assigned stage, and follow the `bayesian-ensemble` and
 question; use a DSGE-style model only when its assumptions and data are suitable.
 Make assumptions, sources, uncertainty, and any actual computations explicit. Do
 not invent data or treat model predictions as independent evidence from their
-inputs. Mark an economic model inapplicable when the question does not support it.
+inputs. Report no model artifact when the question does not support one;
+your proposal will then be excluded from the pool.
 For a review, critique the supplied prior, evidence, model assumptions, and
-posterior; do not repeat the proposal or rebuild a model. Record the requested artifact using the Metaculus MCP tools; do not publish or
+posterior; do not repeat the proposal or rebuild a model. Record the proposal using the Metaculus MCP tools; do not publish or
 change project files. Apply the superforecasting principles in the assigned prompt.

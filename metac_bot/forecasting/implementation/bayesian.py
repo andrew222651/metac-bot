@@ -5,12 +5,9 @@ probabilities. Grouping and conditional dependence remain model judgments.
 """
 
 import math
-from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
-
-from ..strategy.roles import MODEL_ROLES
 
 
 class StrictModel(BaseModel):
@@ -27,9 +24,6 @@ class Evidence(StrictModel):
 
 
 class ModelArtifact(StrictModel):
-    kind: Literal["economic", "causal"]
-    applicable: bool
-    applicability_reason: str = Field(min_length=1, max_length=4000)
     structure: str = Field(min_length=1, max_length=12000)
     equations: str = Field(min_length=1, max_length=12000)
     inputs_and_sources: str = Field(min_length=1, max_length=12000)
@@ -266,12 +260,6 @@ def validate_stage(
     if stage not in schemas:
         raise ValueError("Unknown Bayesian stage")
     parsed = schemas[stage].model_validate(value).model_dump(mode="json")
-    if stage == "proposal" and context.get("role") in MODEL_ROLES:
-        expected = MODEL_ROLES[context["role"]]
-        if parsed["model"] is None or parsed["model"]["kind"] != expected:
-            raise ValueError(
-                f"The {context['role']} must record a {expected} model artifact"
-            )
     if options is not None and stage == "proposal":
         validate_choice_weights(parsed["prior"], options, prior=True)
         for evidence in parsed["evidence"]:

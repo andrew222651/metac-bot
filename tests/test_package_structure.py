@@ -18,10 +18,14 @@ class PackageStructureTests(unittest.TestCase):
         )
 
     def test_prompts_preserve_role_and_standalone_instructions(self) -> None:
-        self.assertEqual(set(MODEL_ROLES), {"economic-modeler", "causal-modeler"})
+        self.assertEqual(set(MODEL_ROLES), {"economic-modeler", "market-analyst"})
         self.assertIn(
             ROLES["economic-modeler"],
             stage_prompt("proposal", "economic-modeler", "stage", one_off=False),
+        )
+        self.assertIn(
+            ROLES["market-analyst"],
+            stage_prompt("proposal", "market-analyst", "stage", one_off=False),
         )
         self.assertIn(
             "do not redo the initial research",

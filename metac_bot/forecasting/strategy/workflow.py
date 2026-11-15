@@ -8,7 +8,7 @@ from forecasting_tools import MetaculusQuestion
 
 from ..implementation.ensemble import EnsembleRunner, EnsembleSettings
 from .pooling import pool_distance, pool_posteriors, publication_prediction
-from .roles import ROLES
+from .roles import MODEL_ROLES, ROLES
 
 
 def uses_ensemble(question: MetaculusQuestion, *, single_agent: bool) -> bool:
@@ -17,7 +17,7 @@ def uses_ensemble(question: MetaculusQuestion, *, single_agent: bool) -> bool:
 
 async def run_workflow(runner: EnsembleRunner) -> dict:
     """Pool independent Bayesian judgments, then review and revise them."""
-    proposals = [
+    submitted = [
         result
         for result in await asyncio.gather(
             *(
@@ -29,6 +29,13 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
         )
         if result is not None
     ]
+    proposals = [
+        item
+        for item in submitted
+        if item["role"] not in MODEL_ROLES or item["result"].get("model") is not None
+    ]
+    dropped_model_roles = [item["role"] for item in submitted if item not in proposals]
+    runner.artifacts["dropped_model_proposals"] = dropped_model_roles
     if not proposals:
         raise RuntimeError(
             f"No Bayesian proposals succeeded; {runner.describe_failures('proposal')}"
@@ -107,7 +114,7 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
             f"Bayesian ensemble did not converge within {runner.settings.review_rounds} review rounds; no forecast published"
         )
     research = "\n\n".join(
-        f"### {item['role']}\n{item['result']['research']}" for item in proposals
+        f"### {item['role']}\n{item['result']['research']}" for item in submitted
     )
     review_summary = (
         f"All {len(previous_reviews)} completed reviewers accepted the consensus and "
@@ -118,13 +125,19 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
         "judgments are reported without establishing convergence; earlier completed "
         "reviews, if any, are retained."
     )
+    dropped_note = (
+        f" Dropped model proposals without an applicable model: {', '.join(dropped_model_roles)}."
+        if dropped_model_roles
+        else " No model proposals were dropped."
+    )
     rationale = (
         "Equal-weight linear pooling of agents' Bayesian judgments; shared evidence "
         "is not treated as independent, and the pool is not a verified Bayesian posterior. "
         "Quantiles use piecewise-linear CDF interpolation and the documented tail assumptions. "
-        f"{len(proposals)} of {len(ROLES)} proposals completed. {review_summary}\n\n"
+        f"{len(proposals)} of {len(ROLES)} proposals pooled "
+        f"({len(submitted)} completed).{dropped_note} {review_summary}\n\n"
         "## Agent proposals, priors, sources, and models\n\n```json\n"
-        + json.dumps(proposals, indent=2)
+        + json.dumps(submitted, indent=2)
         + "\n```\n\n## Ensemble deliberation and revisions\n\n```json\n"
         + json.dumps(runner.artifacts, indent=2)
         + "\n```"

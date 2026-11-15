@@ -6,8 +6,9 @@ description: Construct and evaluate a transparent economic model, including a DS
 # Economic modeling for forecasts
 
 1. Read the assigned question and resolution criteria. Decide whether an
-   economic mechanism is relevant. If not, mark the model inapplicable, explain
-   why, and fill the remaining required artifact fields with "not applicable".
+   economic mechanism is relevant. If not, report no model artifact: omit the
+   `model` field and explain in your reasoning why no applicable model exists.
+   The runner will exclude your proposal from the pooled forecast.
 2. Choose the simplest defensible model. For macroeconomic questions a DSGE-style
    model may be appropriate; otherwise a partial-equilibrium, accounting,
    time-series, or scenario model may be better. Explain the choice and horizon.
@@ -26,9 +27,10 @@ description: Construct and evaluate a transparent economic model, including a DS
    State clearly whether code was executed and which inputs were used; if data,
    permissions or tools are unavailable, give a qualitative model and do not invent
    a numerical forecast. Discuss sensitivity and model misspecification.
-6. Fill the `model` object in your Bayesian proposal: `kind` is `economic`;
-   describe applicability, structure, equations, input sources, inference and
-   implementation, result and uncertainty, and limitations. If you propose
+6. Fill the `model` object in your Bayesian proposal in any form that suits
+   the question; describe its structure, equations, input sources,
+   inference and implementation, result and uncertainty, and limitations.
+   If you propose
    evidence, cite underlying observations and explain the likelihood ratio. The
    model output is an interpretation of those observations, not an additional
    independent observation to multiply into the evidence ledger.

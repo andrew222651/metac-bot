@@ -26,7 +26,7 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
             if request.url.path == "/api/info":
                 return httpx.Response(200, json={"version": "2.0.27"})
             body = json.loads(request.content)
-            self.assertEqual(body["agent"], "causal-modeler")
+            self.assertEqual(body["agent"], "market-analyst")
             self.assertNotIn("model", body)
             self.assertNotIn("permissions", body)
             return httpx.Response(200, json={"data": {"id": "ses_test"}})
@@ -35,7 +35,7 @@ class OpenCodeTests(unittest.IsolatedAsyncioTestCase):
             "http://test", transport=httpx.MockTransport(handle)
         ) as client:
             await client.create_session(
-                Path("/project"), "Test", agent="causal-modeler"
+                Path("/project"), "Test", agent="market-analyst"
             )
 
     async def test_v2_session_prompt_and_wait_contract(self) -> None:

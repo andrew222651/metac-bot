@@ -4,7 +4,6 @@ from pydantic import Field, HttpUrl
 from forecasting_tools import MetaculusQuestion
 
 from ..strategy.pooling import posterior_schema, validate_posterior
-from ..strategy.roles import MODEL_ROLES
 from .bayesian import ModelArtifact, StrictModel
 
 
@@ -55,10 +54,4 @@ def validate_result(
     validate_posterior(question, result["posterior"])
     if stage == "proposal":
         validate_posterior(question, result["prior"])
-        if context.get("role") in MODEL_ROLES:
-            expected = MODEL_ROLES[context["role"]]
-            if result["model"] is None or result["model"]["kind"] != expected:
-                raise ValueError(
-                    f"The {context['role']} must record a {expected} model artifact"
-                )
     return result

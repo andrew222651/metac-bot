@@ -1,7 +1,6 @@
 # Forecasting strategy
 
-This document describes the forecasting strategy at the level of its agents,
-evidence, mathematical aggregation, and review. It is a conceptual specification
+This document is a conceptual specification
 of how a forecast is formed.
 
 
@@ -30,11 +29,19 @@ The ensemble begins with independent proposals from six perspectives:
   sources.
 - **Skeptic:** challenge assumptions and seek credible counterevidence.
 - **Economic modeler:** develop an explicit economic model when relevant.
-- **Causal modeler:** develop an explicit Bayesian causal model when relevant.
+- **Market analyst:** infer the forecast from market variables such as stock
+  price movements, interest rates, and public company financials when relevant.
 
-The modeling agents explain their assumptions, data, uncertainty, and limitations,
-including whether computations were actually performed. They may declare their
-model inapplicable, with reasons. A model's output is an interpretation of its
+A model artifact is the structured, auditable record of an explicit model that
+may accompany a proposal. It describes its structure,
+its equations, its inputs and sources, how inference was carried out and
+implemented (including whether computations were actually performed), its
+result and uncertainty, and its limitations. The economic modeler and the
+market analyst record a model artifact only when an applicable model exists.
+If they find no applicable model, they report no model artifact and their
+proposal is excluded from the pool; a proposal that times out without one is
+likewise ignored for pooling.
+A model's output is an interpretation of its
 inputs, not an additional independent observation.
 
 Agents can use these research tools, subject to configuration and availability:
@@ -57,7 +64,6 @@ Agents can use these research tools, subject to configuration and availability:
   compare resolution rules, time horizons, prices and liquidity before using them.
 
 Agents select tools according to the question rather than calling every service.
-The listed optional research tools are exposed through the research MCP server.
 Provider-generated summaries are leads, not authority: important claims
 should be checked against dated sources. Agents search both for recent evidence
 and for historical or reference-class information, seek contrary evidence, and
@@ -77,11 +83,7 @@ Every forecasting agent's prompt includes a summary of superforecasting principl
 
 Each agent session has a configurable time limit. Agents are told their budget and
 should prioritize recording a valid result before it expires, while reporting
-incomplete research and other limitations honestly. Agents must not ask follow-up
-questions and should finish after recording their result. A valid recorded result can
-be used if the session subsequently times out or requests interactive input; without
-one, that session fails. Input requests are interrupted, never answered automatically.
-Permission requests and other errors do not trigger this recovery.
+incomplete research and other limitations honestly.
 The ensemble uses every successfully recorded proposal and review, without a
 minimum number of agents. If no proposal succeeds, it cannot form a forecast.
 For publishing runs, questions are processed in close-time order, with unknown close
@@ -91,11 +93,6 @@ entire forecast. Session time limits are capped to leave time for one proposal a
 review wave. The runner checks the cached close time and state before publishing;
 it does not refresh the question, so a platform-side early close may still reject it.
 Dry runs and questions without a known close retain the normal session limits.
-
-The GitHub Actions workflow checks for questions every 20 minutes by default.
-Setting the repository variable `METAC_BOT_SCHEDULE_ENABLED` to `false` skips
-scheduled forecast jobs; an unset variable keeps them enabled. Manual runs remain
-available regardless of this variable.
 
 
 ## Ensemble aggregation and review
@@ -148,7 +145,7 @@ cannot define a conditional distribution and causes the ensemble to fail closed.
 ## Review, convergence, and output
 
 In each round, a reviewer is an agent in a new session assigned the perspective
-of one completed proposal. Reviewers independently assess the consensus and the
+of one completed proposal. Reviewers independently assess all
 agents' priors, posteriors, evidence, dependence assumptions, and models. Each
 reviewer flags errors and may revise the posterior for its assigned perspective
 with reasons; a critique is not itself a new evidence factor. Each round recomputes

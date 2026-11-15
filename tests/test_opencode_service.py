@@ -76,7 +76,7 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
                     str(ROOT / "metac_bot/forecasting/strategy/opencode/skills"),
                     config["skills"],
                 )
-                for name in ("causal-modeler", "economic-modeler"):
+                for name in ("market-analyst", "economic-modeler"):
                     self.assertEqual(
                         (config_path.parent / "agents" / f"{name}.md").read_bytes(),
                         (
@@ -364,19 +364,19 @@ class PrivateServiceTests(unittest.IsolatedAsyncioTestCase):
             source = root / "original/opencode"
             (source / "agents").mkdir(parents=True)
             (source / "agents/custom.md").write_text("User agent")
-            (source / "agents/causal-modeler.md").write_text("User version")
+            (source / "agents/market-analyst.md").write_text("User version")
             (source / "opencode.jsonc").write_text('{"skills": ["/user/skills"]}')
             _copy_config(root / "original", root / "copy", None)
             copied = root / "copy/opencode"
             self.assertEqual((copied / "agents/custom.md").read_text(), "User agent")
             self.assertEqual(
-                (source / "agents/causal-modeler.md").read_text(), "User version"
+                (source / "agents/market-analyst.md").read_text(), "User version"
             )
             self.assertEqual(
-                (copied / "agents/causal-modeler.md").read_bytes(),
+                (copied / "agents/market-analyst.md").read_bytes(),
                 (
                     ROOT
-                    / "metac_bot/forecasting/strategy/opencode/agents/causal-modeler.md"
+                    / "metac_bot/forecasting/strategy/opencode/agents/market-analyst.md"
                 ).read_bytes(),
             )
             self.assertEqual(

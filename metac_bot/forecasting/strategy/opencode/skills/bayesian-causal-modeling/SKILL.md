@@ -6,8 +6,8 @@ description: Construct a transparent Bayesian causal model with a causal graph, 
 # Bayesian causal modeling for forecasts
 
 1. Read the assigned question and resolution criteria. Determine whether a
-   causal model can inform it. If not, mark it inapplicable, explain why, and
-   fill the remaining required artifact fields with "not applicable".
+   causal model can inform it. If not, report no model artifact: omit the
+   `model` field and explain in your reasoning why no applicable model exists.
 2. Define the target outcome, exposure or intervention, time horizon, confounders,
    mediators, measurement processes, and selection mechanisms. Specify a directed
    acyclic graph or structural causal model in text, distinguishing observed and
@@ -28,8 +28,12 @@ description: Construct a transparent Bayesian causal model with a causal graph, 
    state whether it was executed and cite inputs. Otherwise give a qualitative model
    and do not invent numerical estimates. Evaluate sensitivity to priors, omitted
    confounding, measurement and model misspecification.
-6. Fill the `model` object in your Bayesian proposal: `kind` is `causal`;
-   describe applicability, graph/structure, equations, input sources, inference and
-   implementation, result and uncertainty, and limitations. Cite observations
-   used as evidence; a posterior derived from them is not a separate independent
-   observation to multiply into the ensemble ledger.
+6. Fill the `model` object in your Bayesian proposal in any form that suits
+   the question; describe its graph/structure, equations, input
+   sources, inference and implementation, result and uncertainty, and
+   limitations. Cite observations used as evidence; a posterior derived from
+   them is not a separate independent observation to multiply into the
+   ensemble ledger.
+   Any forecasting agent may use this skill: build a causal model when it
+   improves the forecast and record it in a model artifact; otherwise do not
+   force a causal model onto a question that does not support one.

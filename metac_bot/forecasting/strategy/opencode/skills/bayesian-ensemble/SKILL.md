@@ -31,9 +31,13 @@ For discrete numeric questions, the quantiles specify a latent continuous CDF;
 the platform converts it into its discrete outcome buckets. Consider the
 resulting bucket probabilities and disclose this approximation.
 
-If your role is `economic-modeler` or `causal-modeler`, load the corresponding
-modeling skill and fill in your model artifact. Mark a model inapplicable with
-reasons when appropriate, using "not applicable" for irrelevant fields.
+If your role is `economic-modeler` or `market-analyst`, load the corresponding
+modeling skill. Record a model artifact only when an applicable model exists;
+if none exists, omit the `model` field and the runner will exclude your
+proposal from the pool.
+Any agent may additionally load `bayesian-causal-modeling` when a causal
+model would help and record a model artifact describing it; causal modeling is
+available to every role, not only a dedicated one.
 
 ## Review
 

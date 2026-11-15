@@ -26,4 +26,11 @@ modeling environment also includes NumPy, SymPy, pandas, statsmodels, NetworkX,
 PyMC, and ArviZ. For calculations, load the modeling-python skill and run
 `bash scripts/python.sh` with the OpenCode shell tool when permitted. Explain
 assumptions, uncertainty, and limitations, and state whether computations actually ran.
+
+When useful and feasible, build an explicit Bayesian causal model. This
+capability is available to every agent, not only a dedicated role. Define the
+target outcome, causal graph, estimand, identification assumptions, and
+uncertainty; load the bayesian-causal-modeling and modeling-python skills;
+and record a model artifact describing it. If no applicable model exists,
+report no model artifact and explain why.
 """

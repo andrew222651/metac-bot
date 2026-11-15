@@ -102,11 +102,8 @@ def choice_decision(ids: list[str], options: list[str]) -> dict:
     }
 
 
-def model_artifact(kind: str) -> dict:
+def model_artifact() -> dict:
     return {
-        "kind": kind,
-        "applicable": True,
-        "applicability_reason": "Relevant",
         "structure": "X causes Y",
         "equations": "Y = f(X)",
         "inputs_and_sources": "Synthetic assumptions",
@@ -231,25 +228,22 @@ class BayesianTests(unittest.TestCase):
         self.assertGreater(result["posterior"], 0.99)
         self.assertEqual(result["published_probability"], 0.99)
 
-    def test_modeler_must_record_the_right_model_kind(self) -> None:
-        for role, kind in [
-            ("economic-modeler", "economic"),
-            ("causal-modeler", "causal"),
-        ]:
+    def test_model_is_optional_at_validation_for_all_roles(self) -> None:
+        for role in ("economic-modeler", "market-analyst", "generalist"):
+            with self.subTest(role=role):
+                validate_stage("proposal", proposal(), {"role": role})
+                data = proposal()
+                data["model"] = model_artifact()
+                validate_stage("proposal", data, {"role": role})
+
+    def test_any_agent_may_record_a_model(self) -> None:
+        for role in ("generalist", "skeptic"):
             with self.subTest(role=role):
                 data = proposal()
-                with self.assertRaisesRegex(ValueError, "model artifact"):
-                    validate_stage("proposal", data, {"role": role})
-                data["model"] = model_artifact(
-                    "causal" if kind == "economic" else "economic"
-                )
-                with self.assertRaisesRegex(ValueError, "model artifact"):
-                    validate_stage("proposal", data, {"role": role})
-                data["model"] = model_artifact(kind)
-                self.assertEqual(
-                    validate_stage("proposal", data, {"role": role})["model"]["kind"],
-                    kind,
-                )
+                data["model"] = model_artifact()
+                validate_stage("proposal", data, {"role": role})
+        self.assertIn("bayesian-causal-modeling", SUPERFORECASTING_PRINCIPLES)
+        self.assertIn("available to every agent", SUPERFORECASTING_PRINCIPLES)
 
 
 class FakeOpenCode:
@@ -346,10 +340,8 @@ class FakeOpenCode:
                         }
                     ],
                 }
-                if stage["context"]["role"] == "economic-modeler":
-                    result["model"] = model_artifact("economic")
-                elif stage["context"]["role"] == "causal-modeler":
-                    result["model"] = model_artifact("causal")
+                if stage["context"]["role"] in ("economic-modeler", "market-analyst"):
+                    result["model"] = model_artifact()
             elif stage["stage"] == "review":
                 result = {
                     "accepts_current": True,
@@ -382,7 +374,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 if title in {
                     "Bayesian review: skeptic",
                     "Bayesian review: economic-modeler",
-                    "Bayesian review: causal-modeler",
+                    "Bayesian review: market-analyst",
                 }:
                     raise RuntimeError("Review failed")
                 await original_wait(session, timeout)
@@ -686,8 +678,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertTrue(artifact["converged"])
             self.assertEqual(artifact["rounds"][1]["posterior_change"], 0)
-            self.assertIn('"kind": "economic"', result["rationale"])
-            self.assertIn('"kind": "causal"', result["rationale"])
+            self.assertIn('"structure": "X causes Y"', result["rationale"])
             self.assertTrue(
                 any(
                     "economic-modeling and modeling-python skills" in prompt
@@ -696,11 +687,11 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertTrue(
                 any(
-                    "bayesian-causal-modeling and modeling-python skills" in prompt
+                    "market-inference and modeling-python skills" in prompt
                     for prompt in client.prompts
                 )
             )
-            for role in ("economic-modeler", "causal-modeler"):
+            for role in ("economic-modeler", "market-analyst"):
                 sessions = [
                     s for s in client.sessions.values() if s["title"].endswith(role)
                 ]
@@ -723,7 +714,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
             self.assertEqual(artifact["weights"], {"generalist": 1.0})
             self.assertTrue(artifact["converged"])
-            self.assertIn("1 of 6 proposals completed", result["rationale"])
+            self.assertIn("1 of 6 proposals pooled", result["rationale"])
 
     async def test_one_successful_review_is_enough(self) -> None:
         with (
@@ -781,6 +772,35 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
                 self.assertNotIn(role, artifact["weights"])
                 self.assertEqual(len(artifact["weights"]), len(ROLES) - 1)
+                self.assertTrue(artifact["converged"])
+
+    async def test_model_role_without_applicable_model_is_dropped(self) -> None:
+        for role in ("economic-modeler", "market-analyst"):
+            with (
+                self.subTest(role=role),
+                TemporaryDirectory() as directory,
+                patch.object(jobs, "JOBS", Path(directory)),
+            ):
+                question = BinaryQuestion(question_text="Synthetic")
+                job_id = jobs.create_job(question)
+                client = FakeOpenCode()
+                original_wait = client.wait
+
+                async def omit_model(session: str, timeout: float) -> None:
+                    await original_wait(session, timeout)
+                    title = client.sessions[session]["title"]
+                    if title == f"Bayesian proposal: {role}":
+                        stage_id = client.sessions[session]["stage_id"]
+                        proposal_result = read_stage(stage_id)
+                        proposal_result["model"] = None
+                        record_stage(stage_id, proposal_result)
+
+                with patch.object(client, "wait", side_effect=omit_model):
+                    result = await run_ensemble(client, question, job_id)
+                artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+                self.assertNotIn(role, artifact["weights"])
+                self.assertEqual(len(artifact["weights"]), len(ROLES) - 1)
+                self.assertIn(role, artifact["dropped_model_proposals"])
                 self.assertTrue(artifact["converged"])
 
     async def test_any_role_can_fail_review(self) -> None:
