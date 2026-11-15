@@ -109,22 +109,27 @@ async def run_workflow(runner: EnsembleRunner) -> dict:
         published_prediction=prediction,
     )
     runner.persist()
-    if not converged and not reviews_unavailable:
-        raise RuntimeError(
-            f"Bayesian ensemble did not converge within {runner.settings.review_rounds} review rounds; no forecast published"
-        )
     research = "\n\n".join(
         f"### {item['role']}\n{item['result']['research']}" for item in submitted
     )
-    review_summary = (
-        f"All {len(previous_reviews)} completed reviewers accepted the consensus and "
-        f"the change met the tolerance; {len(proposals) - len(previous_reviews)} "
-        "reviewers did not complete the final round."
-        if converged
-        else "No reviewers completed the final round. The latest available pooled "
-        "judgments are reported without establishing convergence; earlier completed "
-        "reviews, if any, are retained."
-    )
+    if converged:
+        review_summary = (
+            f"All {len(previous_reviews)} completed reviewers accepted the consensus and "
+            f"the change met the tolerance; {len(proposals) - len(previous_reviews)} "
+            "reviewers did not complete the final round."
+        )
+    elif reviews_unavailable:
+        review_summary = (
+            "No reviewers completed the final round. The latest available pooled "
+            "judgments are reported without establishing convergence; earlier completed "
+            "reviews, if any, are retained."
+        )
+    else:
+        review_summary = (
+            f"Convergence was not established within "
+            f"{runner.settings.review_rounds} review rounds. The linear pooled "
+            "forecast is reported without establishing convergence."
+        )
     dropped_note = (
         f" Dropped model proposals without an applicable model: {', '.join(dropped_model_roles)}."
         if dropped_model_roles

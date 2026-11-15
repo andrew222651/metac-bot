@@ -20,7 +20,7 @@ the condition and the outcome distributions given each condition.
 
 ## Agents and research
 
-The ensemble begins with independent proposals from six perspectives:
+The ensemble begins with independent proposals from up to six perspectives:
 
 - **Generalist:** assess the whole question and balance competing scenarios.
 - **Base-rate analyst:** find reference classes, historical frequencies, and a
@@ -152,12 +152,13 @@ with reasons; a critique is not itself a new evidence factor. Each round recompu
 the pool from the agents' current posteriors and fixed weights.
 If a review does not complete, that perspective retains its previous posterior.
 With at least one completed review, a round converges only when every completed
-reviewer accepts the forecast they reviewed and the new consensus changes by no
+reviewer accepts the forecast it reviewed and the new consensus changes by no
 more than the configured tolerance. If no reviewer completes a round, the latest
 available pooled judgments are returned with a warning that convergence was not
 established; prior completed reviews, if any, remain reflected in the pool. If
 reviewers complete but the maximum number of rounds is reached without convergence,
-the forecast fails closed. The output states how many proposals and reviews completed.
+the linear pooled forecast is output with a warning that convergence was not
+established. The output states how many proposals and reviews completed.
 Change is the absolute probability difference for binary questions, the largest
 option-probability difference for multiple choice, or the largest CDF difference
 for numeric and date questions. For conditional questions it is the largest
@@ -169,7 +170,3 @@ posteriors, evidence and sources, dependence assumptions, review and revision
 history, weights, model artifacts, and remaining limitations. Probability bounds
 and platform conversion may be applied to the reported prediction; the
 underlying pooled judgments are retained separately.
-
-Publishing runs submit predictions to Metaculus without posting comments. Research
-and rationale remain in the locally saved report. Conditional questions submit the
-yes and no branch predictions without comments; dry runs publish neither.

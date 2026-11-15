@@ -904,7 +904,7 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(artifact["reviews_unavailable"])
             self.assertIn("earlier completed reviews", result["rationale"])
 
-    async def test_stable_posterior_without_acceptance_fails_closed(self) -> None:
+    async def test_max_rounds_without_convergence_outputs_pooled_forecast(self) -> None:
         with (
             TemporaryDirectory() as directory,
             patch.object(jobs, "JOBS", Path(directory)),
@@ -930,6 +930,10 @@ class EnsembleTests(unittest.IsolatedAsyncioTestCase):
                 )
 
             with patch.object(client, "wait", side_effect=disagree):
-                with self.assertRaisesRegex(RuntimeError, "did not converge"):
-                    await run_ensemble(client, question, job_id, review_rounds=1)
-            self.assertFalse((jobs.job_path(job_id) / "forecast.json").exists())
+                result = await run_ensemble(client, question, job_id, review_rounds=1)
+            artifact = jobs.read_json(jobs.job_path(job_id) / "ensemble.json")
+            self.assertFalse(artifact["converged"])
+            self.assertFalse(artifact["reviews_unavailable"])
+            self.assertIn("Convergence was not established", result["rationale"])
+            self.assertIn("linear pooled", result["rationale"])
+            self.assertIn("probability", result["prediction"])
