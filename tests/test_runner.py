@@ -188,7 +188,9 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertNotIsInstance(result, Exception)
             metaculus.post_numeric_question_prediction.assert_called_once()
-            metaculus.post_question_comment.assert_not_called()
+            metaculus.post_question_comment.assert_called_once()
+            _, comment_kwargs = metaculus.post_question_comment.call_args
+            self.assertTrue(comment_kwargs.get("is_private"))
             self.assertEqual(len(client.sessions), 2 * len(ROLES))
 
     async def test_environment_failure_returns_without_starting_opencode(self) -> None:
@@ -268,7 +270,17 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
             result = await main.run(args)
             self.assertEqual(client.create_session.await_count, 1)
             self.assertIn(SUPERFORECASTING_PRINCIPLES, client.prompt.await_args.args[1])
-            metaculus.post_question_comment.assert_not_called()
+            if record and not dry_run:
+                metaculus.post_question_comment.assert_called_once()
+                comment_args, comment_kwargs = (
+                    metaculus.post_question_comment.call_args
+                )
+                self.assertEqual(comment_args[0], 1)
+                self.assertIn("Research", comment_args[1])
+                self.assertIn("Reason", comment_args[1])
+                self.assertTrue(comment_kwargs.get("is_private"))
+            else:
+                metaculus.post_question_comment.assert_not_called()
             if record and not dry_run:
                 metaculus.post_binary_question_prediction.assert_called_once_with(
                     2, 0.4

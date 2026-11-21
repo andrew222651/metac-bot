@@ -15,7 +15,9 @@ from metac_bot.infrastructure.runner import publish_prediction
 
 
 class PublicationTests(unittest.TestCase):
-    def test_binary_and_multiple_choice_publish_only_predictions(self) -> None:
+    def test_binary_and_multiple_choice_publish_prediction_and_private_comment(
+        self,
+    ) -> None:
         examples = [
             (
                 BinaryQuestion(question_text="Binary", id_of_post=1, id_of_question=2),
@@ -42,10 +44,16 @@ class PublicationTests(unittest.TestCase):
                 publish_prediction(report, client)
                 getattr(client, method).assert_called_once_with(*arguments)
                 self.assertEqual(
-                    client.method_calls, [call.__getattr__(method)(*arguments)]
+                    client.method_calls,
+                    [
+                        call.__getattr__(method)(*arguments),
+                        call.post_question_comment(
+                            1, report.explanation, is_private=True
+                        ),
+                    ],
                 )
 
-    def test_numeric_discrete_and_date_publish_cdf_only(self) -> None:
+    def test_numeric_discrete_and_date_publish_cdf_and_private_comment(self) -> None:
         questions = [
             NumericQuestion(
                 question_text="Numeric",
@@ -103,11 +111,16 @@ class PublicationTests(unittest.TestCase):
                             [
                                 call.post_numeric_question_prediction(
                                     question.id_of_question, expected
-                                )
+                                ),
+                                call.post_question_comment(
+                                    1, candidate.explanation, is_private=True
+                                ),
                             ],
                         )
 
-    def test_conditional_publishes_only_both_branch_predictions(self) -> None:
+    def test_conditional_publishes_both_branch_predictions_and_private_comments(
+        self,
+    ) -> None:
         def binary(name: str, question_id: int) -> BinaryQuestion:
             return BinaryQuestion(
                 question_text=name, id_of_post=1, id_of_question=question_id
@@ -137,7 +150,13 @@ class PublicationTests(unittest.TestCase):
             client.method_calls,
             [
                 call.post_binary_question_prediction(3, 0.7),
+                call.post_question_comment(
+                    1, report.yes_report.explanation, is_private=True
+                ),
                 call.post_binary_question_prediction(4, 0.3),
+                call.post_question_comment(
+                    1, report.no_report.explanation, is_private=True
+                ),
             ],
         )
 

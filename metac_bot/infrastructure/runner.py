@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 def publish_prediction(report: ForecastReport, metaculus: MetaculusClient) -> None:
-    """Publish only predictions; the library's report publisher also posts comments."""
+    """Publish the prediction and a private comment with the reasoning."""
     if isinstance(report, ConditionalReport):
         publish_prediction(report.yes_report, metaculus)
         publish_prediction(report.no_report, metaculus)
@@ -76,6 +76,9 @@ def publish_prediction(report: ForecastReport, metaculus: MetaculusClient) -> No
         )
     else:
         raise ValueError(f"Unsupported report type: {type(report).__name__}")
+    metaculus.post_question_comment(
+        report.question.id_of_post, report.explanation, is_private=True
+    )
 
 
 async def select_questions(
